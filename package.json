@@ -1,0 +1,15 @@
+{
+  "name": "veganmealplanner",
+  "module": "index.ts",
+  "scripts": {
+    "start": "echo 'Vegan Meal Planner'"
+  },
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

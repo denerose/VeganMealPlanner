@@ -1,0 +1,6 @@
+---
+description: When a VOM ticket is in state review-pending, use the verifier subagent for implementation review.
+alwaysApply: true
+---
+
+When you are working on a VOM ticket and its state is **review-pending**, invoke the **verifier** subagent with that ticket ID (e.g. `/verifier TKT-010`) **immediately in the same response**—do not wait for the user to ask or give further instruction. Do not review and approve the implementation in the same flow; let the verifier run the workflow and report back.
