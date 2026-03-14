@@ -6,6 +6,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
     "test": "bun test",
     "check": "./scripts/check.sh"
   },

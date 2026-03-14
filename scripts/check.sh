@@ -3,8 +3,8 @@
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 
-CHECK_NAMES=( "Format" "Lint" "Tests" )
-CHECK_CMDS=( "bun run format:check" "bun run lint" "bun run test" )
+CHECK_NAMES=( "Format" "Lint" "Typecheck" "Tests" )
+CHECK_CMDS=( "bun run format:check" "bun run lint" "bun run typecheck" "bun run test" )
 
 for i in "${!CHECK_CMDS[@]}"; do
   name="${CHECK_NAMES[$i]}"
