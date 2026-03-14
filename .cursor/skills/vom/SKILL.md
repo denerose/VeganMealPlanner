@@ -32,6 +32,8 @@ Check:
 - The plan (if in implementation phase)
 - Acceptance criteria (if nearing completion)
 
+**If the ticket is in state `review-pending`:** Use the **verifier** subagent to perform the implementation review. Invoke it with the ticket ID (e.g. `/verifier TKT-XXX` or "use the verifier subagent to review TKT-XXX"). The verifier runs the full review workflow in its own context and reports back approved or changes-requested. Do not review and approve in the same flow—let the verifier subagent do it.
+
 ## 4. Do the Work
 
 Follow the guidance and plan. Update comments as needed:
@@ -53,6 +55,8 @@ vom submit TKT-XXX "Ready for review"  # or appropriate transition
 **Same session:** Do not review/approve your own plan if you just created it in this session.
 
 **New session:** You CAN review and approve your own past work. The session boundary provides the "fresh eyes" needed for good review. This is explicitly allowed.
+
+**Implementation review (review-pending):** Use the **verifier** subagent for implementation review, including self-review. Launch it with the ticket ID (e.g. `/verifier TKT-XXX`). The verifier runs in a separate context, verifies criteria and tests, then approves or requests changes and reports the outcome back. Prefer the verifier so review is consistent and isolated.
 
 ---
 
