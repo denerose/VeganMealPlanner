@@ -22,9 +22,6 @@ for i in "${!CHECK_CMDS[@]}"; do
     fi
     exit 1
   fi
-  if [ "$name" = "Tests" ]; then
-    bun run db:seed > /dev/null 2>&1
-  fi
 done
 
 echo "All checks passed."

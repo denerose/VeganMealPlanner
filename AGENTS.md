@@ -9,7 +9,9 @@ This project uses **Bun** as the runtime.
 - **Install dependencies:** `bun install`
 - **Run scripts:** `bun run <script>` (e.g. `bun run start`)
 - **Lint:** `bun run lint` — **Format:** `bun run format` / `bun run format:check`
-- **All checks:** `./scripts/check.sh` runs format check, lint, and tests.
+- **All checks:** `./scripts/check.sh` (or `bun run check`) runs format check, lint, and tests and only prints failures—use it for verification to keep context clean.
+
+**API / backend:** The API runs via `bun run start`. API code lives under `src/api`, tests under `tests/` (e.g. `tests/api/`). Backend work uses Prisma and `src/domain` (types/dtos). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`.
 
 See [README.md](README.md) for more.
 

@@ -2,10 +2,12 @@
   "name": "veganmealplanner",
   "module": "index.ts",
   "scripts": {
-    "start": "echo 'Vegan Meal Planner'",
+    "start": "bun run src/api/server.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "bun test",
+    "check": "./scripts/check.sh"
   },
   "type": "module",
   "private": true,
@@ -15,9 +17,15 @@
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.1",
+    "prisma": "^7.5.0",
     "typescript-eslint": "^8.57.0"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/client": "^7.5.0",
+    "pg": "^8.20.0"
   }
 }
