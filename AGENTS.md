@@ -34,3 +34,5 @@ For **ticket work** (VOM):
 Full agent reference: `vom --agents-help`.
 
 The VOM-related skills (**vom**, **vom-new**, **vom-self-review**) give step-by-step instructions when working on or creating tickets — use them when continuing a ticket or creating a new one.
+
+When a ticket is in **review-pending**, the verifier is prompted by the review-pending guidance and the Cursor rule `vom-review-pending-use-verifier`; use the verifier subagent for implementation review.
