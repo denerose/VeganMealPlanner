@@ -32,6 +32,8 @@ Check:
 - The plan (if in implementation phase)
 - Acceptance criteria (if nearing completion)
 
+**If the ticket is in state `plan-needs-review`:** Open the implementation plan so it's in context for review. Use the **vom-open-plan** skill (or read `.vom/tickets/<ticket-id>/plans/implementation.md` for the ticket you're working on).
+
 **If the ticket is in state `review-pending`:** Use the **verifier** subagent to perform the implementation review. Invoke it with the ticket ID (e.g. `/verifier TKT-XXX` or "use the verifier subagent to review TKT-XXX"). Do so **immediately in the same response**—do not wait for the user to ask. The verifier runs the full review workflow in its own context and reports back approved or changes-requested. Do not review and approve in the same flow—let the verifier subagent do it.
 
 ## 4. Follow the guidance and progress the ticket

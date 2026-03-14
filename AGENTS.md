@@ -23,6 +23,7 @@ See [README.md](README.md) for more.
   - **vom-new** — create a new VOM ticket
   - **vom-self-review** — review recent work and create/update tickets for friction
   - **vom-tidy** — move done tickets to `tickets/done`
+  - **vom-open-plan** — open the implementation plan for a VOM ticket (e.g. "open plan for TKT-017")
 
 Prefer Bun over Node, npm, pnpm, etc., per project rules.
 
@@ -37,6 +38,8 @@ For **ticket work** (VOM):
 
 Full agent reference: `vom --agents-help`.
 
-The VOM-related skills (**vom**, **vom-new**, **vom-self-review**) give step-by-step instructions when working on or creating tickets — use them when continuing a ticket or creating a new one.
+The VOM-related skills (**vom**, **vom-new**, **vom-self-review**, **vom-open-plan**) give step-by-step instructions when working on or creating tickets — use them when continuing a ticket or creating a new one.
+
+When a ticket is in **plan-needs-review**, open its implementation plan (use the **vom-open-plan** skill so the plan is in context for review).
 
 When a ticket is in **review-pending**, the verifier is prompted by the review-pending guidance and the Cursor rule `vom-review-pending-use-verifier`; use the verifier subagent for implementation review.
