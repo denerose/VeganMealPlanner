@@ -52,11 +52,11 @@ vom submit TKT-XXX "Ready for review"  # or appropriate transition
 
 ## About Self-Review
 
-**Same session:** Do not review/approve your own plan if you just created it in this session.
+**Same session (plan review):** Do not review/approve your own *plan* if you just created it in this session.
 
 **New session:** You CAN review and approve your own past work. The session boundary provides the "fresh eyes" needed for good review. This is explicitly allowed.
 
-**Implementation review (review-pending):** Use the **verifier** subagent for implementation review, including self-review. Launch it with the ticket ID (e.g. `/verifier TKT-XXX`). The verifier runs in a separate context, verifies criteria and tests, then approves or requests changes and reports the outcome back. Prefer the verifier so review is consistent and isolated.
+**Implementation review (review-pending):** Use the **verifier** subagent for implementation review, including self-review. Launch it with the ticket ID (e.g. `/verifier TKT-XXX`). The verifier runs in a separate context, verifies criteria and tests, then approves or requests changes and reports the outcome back. Prefer the verifier so review is consistent and isolated. **You may invoke the verifier in the same session**—it runs in a separate sub-session/context, so that is not "self-approve in the same flow" and is allowed and preferred.
 
 ---
 
