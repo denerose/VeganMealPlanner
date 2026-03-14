@@ -34,7 +34,7 @@ Check:
 
 **If the ticket is in state `review-pending`:** Use the **verifier** subagent to perform the implementation review. Invoke it with the ticket ID (e.g. `/verifier TKT-XXX` or "use the verifier subagent to review TKT-XXX"). Do so **immediately in the same response**—do not wait for the user to ask. The verifier runs the full review workflow in its own context and reports back approved or changes-requested. Do not review and approve in the same flow—let the verifier subagent do it.
 
-## 4. Do the Work
+## 4. Follow the guidance and progress the ticket
 
 Follow the guidance and plan. Update comments as needed:
 ```bash
