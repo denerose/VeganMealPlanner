@@ -1,2 +1,4 @@
 .vom/
+!.vom/guidance/
+!.vom/guidance/*
 node_modules/
