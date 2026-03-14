@@ -8,6 +8,8 @@ This project uses **Bun** as the runtime.
 
 - **Install dependencies:** `bun install`
 - **Run scripts:** `bun run <script>` (e.g. `bun run start`)
+- **Lint:** `bun run lint` — **Format:** `bun run format` / `bun run format:check`
+- **All checks:** `./scripts/check.sh` runs format check, lint, and tests.
 
 See [README.md](README.md) for more.
 

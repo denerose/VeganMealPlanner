@@ -2,12 +2,20 @@
   "name": "veganmealplanner",
   "module": "index.ts",
   "scripts": {
-    "start": "echo 'Vegan Meal Planner'"
+    "start": "echo 'Vegan Meal Planner'",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "latest",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
+    "typescript-eslint": "^8.57.0"
   },
   "peerDependencies": {
     "typescript": "^5"
