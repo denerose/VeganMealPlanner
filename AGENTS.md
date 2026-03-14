@@ -23,7 +23,7 @@ See [README.md](README.md) for more.
   - **vom-new** — create a new VOM ticket
   - **vom-self-review** — review recent work and create/update tickets for friction
   - **vom-tidy** — move done tickets to `tickets/done`
-  - **vom-open-plan** — open the implementation plan for a VOM ticket (e.g. "open plan for TKT-017")
+  - **vom-open-plan** — open the implementation plan for a VOM ticket (e.g. "open plan for TKT-017", or "open the plan" when a ticket is already in context)
 
 Prefer Bun over Node, npm, pnpm, etc., per project rules.
 
