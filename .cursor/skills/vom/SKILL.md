@@ -32,7 +32,7 @@ Check:
 - The plan (if in implementation phase)
 - Acceptance criteria (if nearing completion)
 
-**If the ticket is in state `review-pending`:** Use the **verifier** subagent to perform the implementation review. Invoke it with the ticket ID (e.g. `/verifier TKT-XXX` or "use the verifier subagent to review TKT-XXX"). The verifier runs the full review workflow in its own context and reports back approved or changes-requested. Do not review and approve in the same flow—let the verifier subagent do it.
+**If the ticket is in state `review-pending`:** Use the **verifier** subagent to perform the implementation review. Invoke it with the ticket ID (e.g. `/verifier TKT-XXX` or "use the verifier subagent to review TKT-XXX"). Do so **immediately in the same response**—do not wait for the user to ask. The verifier runs the full review workflow in its own context and reports back approved or changes-requested. Do not review and approve in the same flow—let the verifier subagent do it.
 
 ## 4. Do the Work
 
@@ -45,6 +45,8 @@ vom comment TKT-XXX "Progress update..."
 ```bash
 vom submit TKT-XXX "Ready for review"  # or appropriate transition
 ```
+
+**When you have just moved a ticket to `review-pending`** (e.g. after implementing): **invoke the verifier subagent immediately in the same response**—do not stop and wait for the user to ask. Run the verifier so review happens without further instruction.
 
 ## 6. Stop. Once you have completed your work for the current state, do not continue to the next state. Return to the human and let them know where you are in the process. Only proceed to the next state when you have explicit instructions from the human to do so.
 
