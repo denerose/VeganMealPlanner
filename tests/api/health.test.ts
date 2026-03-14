@@ -28,7 +28,7 @@ describe('GET /api/health', () => {
     const mockPrisma: PrismaLike = { $connect: () => Promise.resolve() };
     const handler = createFetchHandler(mockPrisma);
     const res = await handler(new Request('http://localhost/api/health', { method: 'GET' }));
-    const body = await res.json();
+    const body = (await res.json()) as { status: string };
     expect(body).toHaveProperty('status');
     expect(typeof body.status).toBe('string');
   });
