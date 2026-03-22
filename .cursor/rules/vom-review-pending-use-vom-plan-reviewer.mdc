@@ -1,0 +1,6 @@
+---
+description: When a VOM ticket is in state review-pending, use the vom-plan-reviewer subagent for implementation review.
+alwaysApply: true
+---
+
+When you are working on a VOM ticket and its state is **review-pending**, invoke the **vom-plan-reviewer** subagent with that ticket ID (e.g. `/vom-plan-reviewer TKT-010`) **immediately in the same response**—do not wait for the user to ask or give further instruction. Do not review and approve the implementation in the same flow; let vom-plan-reviewer run the workflow and report back.

@@ -42,4 +42,4 @@ The VOM-related skills (**vom**, **vom-new**, **vom-self-review**, **vom-open-pl
 
 When a ticket is in **plan-needs-review**, open its implementation plan (use the **vom-open-plan** skill so the plan is in context for review).
 
-When a ticket is in **review-pending**, the verifier is prompted by the review-pending guidance and the Cursor rule `vom-review-pending-use-verifier`; use the verifier subagent for implementation review.
+When a ticket is in **review-pending**, the review-pending guidance and the Cursor rule `vom-review-pending-use-vom-plan-reviewer` prompt use of the **vom-plan-reviewer** subagent for implementation review.
