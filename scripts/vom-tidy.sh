@@ -3,7 +3,8 @@
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT" || exit 1
 
-mkdir -p .vom/tickets/done .vom/tickets/deleted
+[ -d .vom/tickets/done ] || mkdir -p .vom/tickets/done
+[ -d .vom/tickets/deleted ] || mkdir -p .vom/tickets/deleted
 
 moved_done=()
 moved_deleted=()
