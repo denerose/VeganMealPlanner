@@ -1,0 +1,48 @@
+openapi: 3.0.3
+info:
+  title: Vegan Meal Planner API
+  version: 0.1.0
+  description: |
+    HTTP API for Vegan Meal Planner.
+
+    Requests to any path or HTTP method not documented below receive **404** with an **empty** body.
+servers:
+  - url: /
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Database is reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthOk'
+        '503':
+          description: Database is not reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+components:
+  schemas:
+    HealthOk:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+    HealthError:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - error

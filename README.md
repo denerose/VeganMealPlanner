@@ -22,3 +22,5 @@ The API runs with Bun and uses Prisma and Postgres.
 4. **Start the API:** `bun run start`
 
 The server listens on port 3000 (or `PORT`). **`GET /api/health`** returns `200` with `{ "status": "ok" }` when the database is reachable, and `503` with `{ "status": "error" }` when it is not.
+
+The published HTTP contract is **`contracts/openapi.yaml`** (OpenAPI 3). Tests validate this spec (`tests/contracts/openapi.test.ts`); run `bun test` or `./scripts/check.sh` after changing the API or the contract.

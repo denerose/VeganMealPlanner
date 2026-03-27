@@ -1,0 +1,9 @@
+---
+description: Keep contracts/openapi.yaml in sync when changing HTTP API code under src/api.
+globs: "src/api/**, contracts/openapi.yaml"
+alwaysApply: false
+---
+
+When you change HTTP routes, methods, status codes, or JSON response bodies under `src/api/`, update `contracts/openapi.yaml` in the **same change set** so the published contract matches the implementation.
+
+Before finishing, run `bun test tests/contracts/openapi.test.ts`, or `bun test`, or `./scripts/check.sh` so OpenAPI validation still passes.
