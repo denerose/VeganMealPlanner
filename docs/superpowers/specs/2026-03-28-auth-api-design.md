@@ -17,17 +17,18 @@
   - **Create household:** new `User` + new `Household` + `HouseholdMembership` with **`role = OWNER`**.
   - **Join household:** new `User` + **`HouseholdMembership` with `role = MEMBER`** via a valid, email-bound **`HouseholdInvitation`** (no new household).
 - **`POST /api/auth/login`** — verify email + password; return the same **access token envelope** as register.
+- **`POST /api/auth/logout`** — **authenticated** (resolve **`userId`** via Bearer JWT or dev header); see [Logout semantics](#post-apiauthlogout).
 - **`POST /api/household/invitations`** (authenticated) — create an invitation for a **specific email**; return a **one-time plaintext token** for sharing with the invitee (not stored in plaintext in DB).
 - **Production:** **`Authorization: Bearer <JWT>`** where the server **signs and verifies** the JWT; payload **`sub`** is **`User.id`** (UUID), with **`exp`** (and **`iat`**). This replaces decode-only handling and closes the current verification gap.
 - **Development:** keep **`AUTH_MODE=development`** and **`X-Dev-User-Id: <user-uuid>`** as today; **reject** that header when not in dev mode. Same **membership** rules as the REST spec for protected routes.
-- **Public (unauthenticated) routes:** **`GET /api/health`**, **`POST /api/auth/register`**, **`POST /api/auth/login`** — must not require `HouseholdMembership` (register/login run before membership exists or use invite path).
+- **Public (unauthenticated) routes:** **`GET /api/health`**, **`POST /api/auth/register`**, **`POST /api/auth/login`** — must not require `HouseholdMembership` (register/login run before membership exists or use invite path). **`POST /api/auth/logout`** is **not** public: it requires **valid identity** but does **not** require **`HouseholdMembership`** (see [Protected routes](#protected-routes-unchanged-list--wiring)).
 - **`dev-seed` script:** idempotent seed of a **fixed-UUID dev user**, **dev household**, **`OWNER` membership**, and a small **plant-based** fixture set (meals, ingredients, day plans) so **`X-Dev-User-Id`** and integration tests stay stable.
 - **OpenAPI** (`contracts/openapi.yaml`) documents new paths, request/response schemas, and security schemes.
 
 ## Non-goals (MVP)
 
 - **OAuth / social login** — design assumes **`User.passwordHash`** may later be **null** for OAuth-linked accounts and a separate **provider identity** table will link **`User`** to issuer + subject; not specified here beyond that compatibility note.
-- **Refresh tokens** — optional follow-up; **logout** endpoint is **optional** until refresh (or session) exists.
+- **Refresh tokens** — optional follow-up; when added, **`POST /api/auth/logout`** should **revoke** the caller’s refresh token(s) server-side. **Access JWTs** remain **stateless** until **`exp`** (no server-side blocklist in MVP).
 - **Email delivery** — invitations are **API-issued tokens**; no SMTP requirement for MVP (inviter copies link or token out of band).
 - **Remove household member** — **not implemented** in MVP; [Future: remove members](#future-remove-members) records product and API intent.
 - **Password reset / email verification** — follow-up.
@@ -79,6 +80,7 @@
 - **Claims:** **`sub`** = **`User.id`** (UUID string), **`exp`**, **`iat`**. Optional future: **`householdId`** with [optional equality check](2026-03-28-rest-api-design.md) against DB.
 - **TTL:** configurable (e.g. **`JWT_EXPIRES_IN`** as seconds or a parsed duration); document default (e.g. **15m** or **1h**) in `.env.example`.
 - **Verification:** In **`AUTH_MODE` ≠ `development`**, **verify signature and `exp`** before trusting **`sub`**. Reject malformed or expired tokens with **`401`** and stable **`code`** (e.g. `invalid_token`).
+- **Logout (MVP):** the server does **not** invalidate or blocklist access JWTs; clients **discard** tokens after a successful logout. Short TTLs limit exposure if a token is leaked after logout.
 
 ## Route behavior
 
@@ -124,6 +126,15 @@
 
 **Errors:** wrong credentials → **`401`**, stable **`code`** (e.g. `invalid_credentials`); use **one** message style for login failures to reduce user enumeration (product choice: same message for unknown email vs wrong password).
 
+### `POST /api/auth/logout`
+
+- **Auth:** Same as protected routes for **identity only** — **`Authorization: Bearer <accessToken>`** in production, or **`X-Dev-User-Id`** when **`AUTH_MODE=development`**. Resolve **`userId`**; **`401`** / **`403`** follow the same rules as elsewhere.
+- **Household:** **Do not** require **`HouseholdMembership`** for this route. Rationale: the client must be able to clear session state even if the user is in a bad tenancy state (e.g. zero memberships) while still proving they hold a valid token for that **`userId`**.
+- **Body:** empty JSON object **`{}`** or **no body** — document one style in OpenAPI and accept both if convenient for clients.
+- **Response `204` No Content** (preferred) or **`200`** with **`{ "ok": true }`** if the stack strongly prefers JSON for all mutations; pick one and document.
+- **Server-side work (MVP):** optional **no-op** beyond successful auth (**idempotent:** repeated calls succeed). **Future:** revoke **refresh** token(s) for **`userId`** when refresh tokens exist.
+- **Development:** with **`X-Dev-User-Id`**, logout still succeeds (same as any authenticated route) so clients can exercise the same code path without a JWT.
+
 ### `POST /api/household/invitations` (authenticated)
 
 - Caller must have **`HouseholdMembership`** for their household (existing middleware).
@@ -133,7 +144,8 @@
 
 ### Protected routes (unchanged list + wiring)
 
-- All existing **`/api/*`** routes except **`GET /api/health`** and **`POST /api/auth/register`** / **`POST /api/auth/login`** require resolved **`userId`** and **`HouseholdMembership`** as in [`2026-03-28-rest-api-design.md`](2026-03-28-rest-api-design.md).
+- **Tier A — identity + household:** All existing **`/api/*`** routes except **`GET /api/health`**, **`POST /api/auth/register`**, **`POST /api/auth/login`**, and **`POST /api/auth/logout`** require resolved **`userId`** and **`HouseholdMembership`** as in [`2026-03-28-rest-api-design.md`](2026-03-28-rest-api-design.md).
+- **Tier B — identity only:** **`POST /api/auth/logout`** requires resolved **`userId`** (and thus passes through the same Bearer / dev-header gate) but **skips** `getHouseholdForUser` / household context.
 - **`GET /api/me`** (and related DTOs) should expose **`membershipRole`** (or nested **`role`** under membership) so clients know **`OWNER` vs `MEMBER`**.
 
 ## Development override
@@ -171,7 +183,7 @@
 
 - Extend **`contracts/openapi.yaml`** with paths, schemas, **`401`/`403`/`409`/`422`** responses, and document **`bearerAuth`** as **signed JWT** (issuer = this API). **Malformed JSON / unsupported body** for these routes should match whatever the API layer already does for other **`/api`** handlers and be documented consistently in OpenAPI.
 - **Unit tests:** JWT sign/verify, password verify, `resolveAuthUserId` in dev vs prod with verification.
-- **Integration tests:** register (both paths), login, duplicate email, bad invite token, email mismatch on invite, invitation create + consume; **`AUTH_MODE=development`** unchanged for existing suites.
+- **Integration tests:** register (both paths), login, **logout** (JWT and dev header), duplicate email, bad invite token, email mismatch on invite, invitation create + consume; **`AUTH_MODE=development`** unchanged for existing suites.
 
 ## References
 
