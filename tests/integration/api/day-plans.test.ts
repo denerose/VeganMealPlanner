@@ -126,4 +126,79 @@ describe('Day plans API (integration)', () => {
     );
     expect(res.status).toBe(422);
   });
+
+  test('GET range returns 200', async () => {
+    const { userId } = seeded!;
+    const res = await handler(
+      new Request('http://localhost/api/day-plans?from=2027-03-01&to=2027-03-07', {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown[];
+    expect(Array.isArray(body)).toBe(true);
+  });
+
+  test('POST GET PATCH DELETE day plan and POST bulk', async () => {
+    const { userId, householdId } = seeded!;
+    const date = '2027-04-10';
+    const meal = await prisma.meal.create({
+      data: { householdId, name: 'Plan meal', description: '' },
+    });
+
+    const postRes = await handler(
+      new Request('http://localhost/api/day-plans', {
+        method: 'POST',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, lunchMealId: null, dinnerMealId: null }),
+      })
+    );
+    expect(postRes.status).toBe(201);
+    const created = (await postRes.json()) as { id: string; date: string };
+    expect(created.date).toBe(date);
+
+    const getRes = await handler(
+      new Request(`http://localhost/api/day-plans/${created.id}`, {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(getRes.status).toBe(200);
+
+    const patchRes = await handler(
+      new Request(`http://localhost/api/day-plans/${created.id}`, {
+        method: 'PATCH',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lunchMealId: meal.id }),
+      })
+    );
+    expect(patchRes.status).toBe(200);
+    const patched = (await patchRes.json()) as { lunchMealId: string | null };
+    expect(patched.lunchMealId).toBe(meal.id);
+
+    const delRes = await handler(
+      new Request(`http://localhost/api/day-plans/${created.id}`, {
+        method: 'DELETE',
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(delRes.status).toBe(204);
+
+    const bulkDate = '2027-04-11';
+    const bulkRes = await handler(
+      new Request('http://localhost/api/day-plans/bulk', {
+        method: 'POST',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ date: bulkDate, dinnerMealId: meal.id }]),
+      })
+    );
+    expect(bulkRes.status).toBe(200);
+    const bulkBody = (await bulkRes.json()) as { date: string }[];
+    expect(Array.isArray(bulkBody)).toBe(true);
+    expect(bulkBody.some((d) => d.date === bulkDate)).toBe(true);
+    const row = await prisma.dayPlan.findFirst({
+      where: { householdId, date: planDateFromYmd(bulkDate) },
+    });
+    expect(row).not.toBeNull();
+    expect(row!.dinnerMealId).toBe(meal.id);
+  });
 });

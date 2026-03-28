@@ -84,4 +84,61 @@ describe('Ingredients API (integration)', () => {
     const j = (await res.json()) as { code: string };
     expect(j.code).toBe('ingredient_in_use');
   });
+
+  test('POST 201 then GET list, GET by id, PATCH rename', async () => {
+    const { userId } = seeded!;
+    const headers = { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' };
+    const createRes = await handler(
+      new Request('http://localhost/api/ingredients', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: '  Tahini ',
+          storageType: IngredientStorageType.PANTRY,
+        }),
+      })
+    );
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as { id: string; name: string };
+    expect(created.name.toLowerCase()).toContain('tahini');
+
+    const listRes = await handler(
+      new Request('http://localhost/api/ingredients', {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(listRes.status).toBe(200);
+    const list = (await listRes.json()) as { id: string }[];
+    expect(list.some((r) => r.id === created.id)).toBe(true);
+
+    const getRes = await handler(
+      new Request(`http://localhost/api/ingredients/${created.id}`, {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(getRes.status).toBe(200);
+
+    const patchRes = await handler(
+      new Request(`http://localhost/api/ingredients/${created.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ name: 'Organic Tahini' }),
+      })
+    );
+    expect(patchRes.status).toBe(200);
+    const patched = (await patchRes.json()) as { name: string };
+    expect(patched.name.toLowerCase()).toContain('tahini');
+  });
+
+  test('GET /api/ingredients/{id} unknown id returns 404 not_found', async () => {
+    const { userId } = seeded!;
+    const res = await handler(
+      new Request('http://localhost/api/ingredients/00000000-0000-4000-8000-000000000099', {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe('not_found');
+  });
 });

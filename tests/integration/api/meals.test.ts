@@ -216,4 +216,61 @@ describe('Meals API (integration)', () => {
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe('meal_in_use');
   });
+
+  test('GET /api/meals returns 200 list', async () => {
+    const { userId, householdId } = seeded!;
+    await prisma.meal.create({
+      data: { householdId, name: 'ListMeal', description: 'Chickpea bowl' },
+    });
+    const res = await handler(
+      new Request('http://localhost/api/meals', {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { name: string }[];
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.some((m) => m.name === 'ListMeal')).toBe(true);
+  });
+
+  test('POST /api/meals minimal body returns 201', async () => {
+    const { userId } = seeded!;
+    const res = await handler(
+      new Request('http://localhost/api/meals', {
+        method: 'POST',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Simple tofu stir-fry' }),
+      })
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { name: string; id: string };
+    expect(body.name).toBe('Simple tofu stir-fry');
+    expect(body.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  });
+
+  test('GET and PATCH /api/meals/{id}', async () => {
+    const { userId, householdId } = seeded!;
+    const meal = await prisma.meal.create({
+      data: { householdId, name: 'Before patch', description: '' },
+    });
+    const getRes = await handler(
+      new Request(`http://localhost/api/meals/${meal.id}`, {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(getRes.status).toBe(200);
+    const getBody = (await getRes.json()) as { name: string };
+    expect(getBody.name).toBe('Before patch');
+
+    const patchRes = await handler(
+      new Request(`http://localhost/api/meals/${meal.id}`, {
+        method: 'PATCH',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'After patch' }),
+      })
+    );
+    expect(patchRes.status).toBe(200);
+    const patchBody = (await patchRes.json()) as { name: string };
+    expect(patchBody.name).toBe('After patch');
+  });
 });
