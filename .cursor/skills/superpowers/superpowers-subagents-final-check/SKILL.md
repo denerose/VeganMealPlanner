@@ -46,7 +46,7 @@ For every row, decide:
 
 ### 3. Severity → VOM handling (this project)
 
-Align with **Capturing code quality review feedback** in `.cursor/skills/subagent-driven-development/SKILL.md`:
+Align with **Capturing code quality review feedback** in `.cursor/skills/superpowers/subagent-driven-development/SKILL.md`:
 
 - **Critical / Important (blocking):** Should have been fixed before merge; if still open, create a **task** or **bug** and treat as high priority.
 - **Important (non-blocking):** **task** or **docs**—must not disappear without a ticket or an explicit plan note.
