@@ -1,6 +1,6 @@
 # Auth API design — registration, login, invitations, JWT
 
-**Status:** Ready for human review  
+**Status:** Ready for human review (agent spec review: Approved)  
 **Date:** 2026-03-28  
 **Scope:** First-party **email + password** accounts, **signed JWT** access tokens, **email-bound household invitations**, **`HouseholdMembership` roles** (`OWNER` / `MEMBER`), **development auth override**, and a **`dev-seed`** script. Aligns with [`2026-03-28-rest-api-design.md`](2026-03-28-rest-api-design.md), [`docs/data-model.md`](../../data-model.md), and `prisma/schema.prisma`. **OAuth** is an explicit future extension (see [Non-goals (MVP)](#non-goals-mvp)).
 
@@ -9,6 +9,7 @@
 - **`401`** — **Bearer JWT** missing, malformed as a JWT, bad **signature**, **expired**, or wrong shape for access auth (stable codes, e.g. `invalid_token`).
 - **`422`** — **JSON request body** validation only: email format, password policy, unknown/extra fields per OpenAPI, **invite token** wrong length/format when the server validates format before lookup, and **ambiguous registration body** (see [`POST /api/auth/register`](#post-apiauthregister)).
 - **`403`** / **`409`** — as in the REST spec and the sections below.
+- **`POST /api/auth/login`** wrong password or unknown email (product-chosen messaging) → **`401`**, not **`422`**.
 
 ## Goals
 
@@ -168,7 +169,7 @@
 
 ## OpenAPI & testing
 
-- Extend **`contracts/openapi.yaml`** with paths, schemas, **`401`/`409`/`422`** responses, and document **`bearerAuth`** as **signed JWT** (issuer = this API).
+- Extend **`contracts/openapi.yaml`** with paths, schemas, **`401`/`403`/`409`/`422`** responses, and document **`bearerAuth`** as **signed JWT** (issuer = this API). **Malformed JSON / unsupported body** for these routes should match whatever the API layer already does for other **`/api`** handlers and be documented consistently in OpenAPI.
 - **Unit tests:** JWT sign/verify, password verify, `resolveAuthUserId` in dev vs prod with verification.
 - **Integration tests:** register (both paths), login, duplicate email, bad invite token, email mismatch on invite, invitation create + consume; **`AUTH_MODE=development`** unchanged for existing suites.
 
