@@ -66,6 +66,8 @@ Follow `.cursor/skills/vom-new/SKILL.md` for title/description quality.
 
 If a suggestion is under about **two minutes** of work (rename a misleading test, typo in comment), **fix in the repo** and **do not** open a ticket unless the user wants audit trail.
 
+**Ad-hoc docs under `tests/` or `src/`:** If a review or reconciliation finds a new `README.md` under `tests/**` or `src/**` that the user did not ask for, **move** the content to **[TESTING.md](TESTING.md)** (or the appropriate existing doc) and **delete** the stray file—see `.cursor/rules/documentation-no-ad-hoc-readmes-tests-src.mdc`.
+
 ### 5. Report back
 
 Give a short table:
@@ -80,6 +82,7 @@ Optionally append a **Review debt** subsection to the relevant plan under `docs/
 
 - **subagent-driven-development:** reviewers may output **VOM ticket drafts**; this skill confirms the tree and creates or adjusts tickets.
 - **verification-before-completion:** run this closeout when review debt could block “all green.”
+- **Full verification with DB:** `bun run check-all` / `./scripts/check-all.sh` runs integration tests too—use **only** when integration tests changed or unit tests are insufficient; default remains `bun run check` (see **AGENTS.md**).
 
 ## Red flags
 

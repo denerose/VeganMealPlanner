@@ -14,7 +14,8 @@ Useful scripts:
 - `bun run test:unit` — unit tests only
 - `bun run test:integration` — integration tests only
 - `bun run test:all` — both
-- `./scripts/check.sh` or `bun run check` — format, lint, typecheck, and tests
+- `./scripts/check.sh` or `bun run check` — format, lint, typecheck, and **unit** tests (default verification)
+- `./scripts/check-all.sh` or `bun run check-all` — same as `check`, plus **integration** tests (requires DB). **Use only when** integration tests were **updated** or **unit tests cannot fully exercise** the behavior under test; otherwise prefer `check`.
 
 ## Reusing fixture data in API integration tests
 
@@ -45,3 +46,21 @@ When adding deletes, respect FK order (for example clear `DayPlan` before `Meal`
 ## When this pattern is optional
 
 Nested `describe` blocks with **different** lifecycle needs, **one-off** setup, or only a single test may use local `beforeAll` / `afterAll` without the shared seed helpers—for example [`tests/integration/api/me-household.test.ts`](tests/integration/api/me-household.test.ts).
+
+## HTTP API integration tests — coverage map
+
+Tests under [`tests/integration/api/`](tests/integration/api/) hit `createFetchHandler` with a real database. When you add or change a path under `/api/*` in [`contracts/openapi.yaml`](contracts/openapi.yaml):
+
+1. Update the `DOCUMENTED_API_PATHS` list in [`tests/unit/contracts/openapi.test.ts`](tests/unit/contracts/openapi.test.ts).
+2. Add or extend tests in the file(s) below (and extend this table if you introduce a new area).
+
+| OpenAPI area                                       | Primary test file(s)                                                                   |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Health                                             | [`health.test.ts`](tests/integration/api/health.test.ts)                               |
+| Auth (register, login, logout)                     | [`auth.test.ts`](tests/integration/api/auth.test.ts)                                   |
+| Routing (undocumented 404 empty body, 405 + Allow) | [`routing-contract.test.ts`](tests/integration/api/routing-contract.test.ts)           |
+| Me, household, members                             | [`me-household.test.ts`](tests/integration/api/me-household.test.ts)                   |
+| Household invitations                              | [`household-invitations.test.ts`](tests/integration/api/household-invitations.test.ts) |
+| Ingredients                                        | [`ingredients.test.ts`](tests/integration/api/ingredients.test.ts)                     |
+| Meals                                              | [`meals.test.ts`](tests/integration/api/meals.test.ts)                                 |
+| Day plans                                          | [`day-plans.test.ts`](tests/integration/api/day-plans.test.ts)                         |

@@ -9,7 +9,8 @@ This project uses **Bun** as the runtime.
 - **Install dependencies:** `bun install`
 - **Run scripts:** `bun run <script>` (e.g. `bun run start`)
 - **Lint:** `bun run lint` — **Format:** `bun run format` / `bun run format:check`
-- **All checks:** `./scripts/check.sh` (or `bun run check`) runs format check, lint, typecheck, and tests and only prints failures—use it for verification to keep context clean.
+- **All checks (default):** `./scripts/check.sh` (or `bun run check`) runs format check, lint, typecheck, and **unit** tests only; failures are summarized to keep context clean—use this for routine verification.
+- **Checks including integration tests:** `./scripts/check-all.sh` (or `bun run check-all`) runs the same steps plus **`bun run test:integration`** (needs Postgres with migrations applied). **Use `check-all` only when** you have **updated integration tests** or the **current implementation cannot be fully validated by unit tests alone**—otherwise prefer `check` / `bun run check` to avoid unnecessary DB dependency and runtime.
 
 **API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`. **Testing conventions and integration fixtures:** [TESTING.md](TESTING.md).
 
@@ -30,6 +31,8 @@ See [README.md](README.md) for more.
 - **Vegan branding in ephemera:** Keep examples, seed data, test fixtures, OpenAPI samples, doc snippets, and any other non-production copy aligned with the app’s purpose: **plant-based / vegan food only**. Do not use animal products, non-vegan dishes, or messaging that conflicts with vegan principles in sample names, ingredient lists, or placeholder text.
 
 Prefer Bun over Node, npm, pnpm, etc., per project rules.
+
+- **Docs in test/source trees:** Do not add `README.md` under `tests/**` or `src/**` unless the user explicitly asked for that path. Put testing notes and API test coverage maps in **[TESTING.md](TESTING.md)**. See Cursor rule `documentation-no-ad-hoc-readmes-tests-src.mdc`.
 
 ## Workflow
 
