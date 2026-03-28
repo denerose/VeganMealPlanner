@@ -125,6 +125,27 @@ Split tests so **integration** runs less often locally:
 
 **`scripts/check.sh`:** run **unit tests only** for local “check”; run **`test:all`** in CI before merge (or a dedicated CI job for integration). Relocate existing tests (e.g. `tests/api/`) under `tests/integration/` when wiring this up.
 
+## Documentation in the repo
+
+This spec is the **design record** (rationale, invariants, DTO rules). It is intentionally **separate from any one implementation plan** so humans and agents can refer to it for as long as the product area exists. It does **not** replace the database’s mechanical definition.
+
+### Sources of truth (by concern)
+
+| Concern | Where it lives | Role |
+|--------|----------------|------|
+| **Tables, columns, enums, indexes** | `prisma/schema.prisma` (and migrations) | Canonical **persistence** shape; must match deployed Postgres. |
+| **Design intent & cross-cutting rules** | `docs/superpowers/specs/2026-03-28-data-model-design.md` (this doc) | **Why** and **how** (tenancy, nested DTOs vs flat storage, delete rules, date semantics). Update when behavior or product rules change, not only when column names change. |
+| **API-facing types** | `src/domain/` (`types/`, `dtos/`, mappers) | What handlers and clients conceptually exchange; should stay aligned with OpenAPI when routes exist. |
+| **Discovery / quick orientation** | `docs/data-model.md` | Short **index**: entity list, links to the spec and Prisma schema, and a **maintenance** note so contributors know what to update together. |
+
+### Keeping docs current (process)
+
+- Any PR that **changes the relational model** (Prisma schema / migrations) must **update `docs/data-model.md`** if the overview table, entity list, or links would otherwise be wrong.
+- The same PR should **revise this spec** when the change is not purely mechanical (e.g. new invariants, new qualities strategy, tenancy rules). For renames-only changes, updating Prisma + `docs/data-model.md` may suffice; if rationale shifts, update the spec in the same or a follow-up PR.
+- Agents and reviewers: treat **schema + index doc + spec (when applicable)** as the default checklist for “data model documentation” completeness.
+
+`AGENTS.md` points to **`docs/data-model.md`** so agents and devs can find the data model without opening a ticket plan.
+
 ## Out of scope (MVP)
 
 - Breakfast/snacks slots
