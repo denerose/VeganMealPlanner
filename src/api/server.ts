@@ -26,7 +26,7 @@ export function createFetchHandler(db: PrismaClient) {
       return new Response(null, { status: 405, headers: { Allow: 'GET' } });
     }
 
-    const auth = resolveAuthUserId(req);
+    const auth = await resolveAuthUserId(req);
     if (auth instanceof Response) return auth;
 
     try {

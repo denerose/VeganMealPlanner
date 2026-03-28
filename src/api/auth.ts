@@ -1,30 +1,26 @@
 import { jsonError } from './errors';
+import {
+  JwtAccessTokenExpiredError,
+  JwtAccessTokenInvalidAlgorithmError,
+  JwtAccessTokenInvalidSignatureError,
+  JwtAccessTokenMalformedError,
+  verifyAccessToken,
+} from './jwt-access';
 import { isUuid } from './uuid';
 
 export { isUuid } from './uuid';
 
-function jwtPayloadJson(b64url: string): unknown {
-  let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
-  while (b64.length % 4) b64 += '=';
-  const json = atob(b64);
-  return JSON.parse(json) as unknown;
-}
-
-export function decodeJwtSub(token: string): string | null {
-  const parts = token.split('.');
-  const payloadPart = parts[1];
-  if (parts.length < 2 || payloadPart === undefined) return null;
-  try {
-    const payload = jwtPayloadJson(payloadPart) as { sub?: unknown };
-    const sub = payload.sub;
-    return typeof sub === 'string' ? sub : null;
-  } catch {
-    return null;
-  }
+function isJwtAccessVerifyFailure(e: unknown): boolean {
+  return (
+    e instanceof JwtAccessTokenExpiredError ||
+    e instanceof JwtAccessTokenInvalidSignatureError ||
+    e instanceof JwtAccessTokenInvalidAlgorithmError ||
+    e instanceof JwtAccessTokenMalformedError
+  );
 }
 
 /** Resolve `User.id` from request headers, or return a JSON error `Response`. */
-export function resolveAuthUserId(req: Request): string | Response {
+export async function resolveAuthUserId(req: Request): Promise<string | Response> {
   const mode = process.env.AUTH_MODE ?? 'production';
   const devHeader = req.headers.get('X-Dev-User-Id');
 
@@ -55,9 +51,16 @@ export function resolveAuthUserId(req: Request): string | Response {
     return jsonError(401, 'unauthorized', 'Empty bearer token');
   }
 
-  const sub = decodeJwtSub(token);
-  if (!sub || !isUuid(sub)) {
-    return jsonError(401, 'unauthorized', 'Invalid bearer token');
+  try {
+    const { sub } = await verifyAccessToken(token);
+    if (!isUuid(sub)) {
+      return jsonError(401, 'invalid_token', 'Access token subject must be a valid UUID');
+    }
+    return sub;
+  } catch (e) {
+    if (isJwtAccessVerifyFailure(e)) {
+      return jsonError(401, 'invalid_token', 'Invalid or expired access token');
+    }
+    throw e;
   }
-  return sub;
 }
