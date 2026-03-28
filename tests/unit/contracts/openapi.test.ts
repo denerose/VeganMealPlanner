@@ -18,6 +18,10 @@ describe('contracts/openapi.yaml', () => {
     const api = await SwaggerParser.validate(specPath);
     const paths = api.paths ?? {};
     expect(paths['/api/me']?.get).toBeDefined();
+    expect(paths['/api/auth/register']?.post).toBeDefined();
+    expect(paths['/api/auth/login']?.post).toBeDefined();
+    expect(paths['/api/auth/logout']?.post).toBeDefined();
+    expect(paths['/api/household/invitations']?.post).toBeDefined();
     expect(paths['/api/meals']?.get).toBeDefined();
     expect(paths['/api/meals/random']?.get).toBeDefined();
     expect(paths['/api/day-plans']?.get).toBeDefined();

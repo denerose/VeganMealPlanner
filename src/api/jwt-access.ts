@@ -78,6 +78,17 @@ function requireExpiresInSeconds(): number {
 }
 
 /**
+ * Validates the same env vars used by `signAccessToken` / `verifyAccessToken`.
+ * Call once at API process startup when production-style bearer JWT auth is in use
+ * (`AUTH_MODE` not `development`) so missing config fails at deploy time instead of
+ * on the first request or as an unhandled error from `resolveAuthUserId`.
+ */
+export function assertJwtAccessConfigLoaded(): void {
+  requireSecret();
+  requireExpiresInSeconds();
+}
+
+/**
  * Signs an HS256 access JWT with `sub`, `iat`, and `exp`.
  * Requires `JWT_SECRET` and `JWT_EXPIRES_IN` (seconds). Missing `JWT_SECRET` throws (never signs with an empty key).
  */

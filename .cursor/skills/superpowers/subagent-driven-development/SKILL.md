@@ -135,6 +135,8 @@ The **controller** (main session) must not treat “Approved” or “approve wi
 
 **Pair with:** **superpowers:verification-before-completion** — final checks should include “no unrecorded Important review items.”
 
+**Reviewers:** The code-quality reviewer prompt instructs subagents to **create VOM tickets** (or output **VOM ticket drafts**) for **Minor** items and non-blocking **suggestions** — see `code-quality-reviewer-prompt.md`. The spec reviewer prompt does the same for optional, non-blocking observations — see `spec-reviewer-prompt.md`.
+
 ## Prompt Templates
 
 Paths are relative to this skill folder (`.cursor/skills/subagent-driven-development/`):

@@ -55,6 +55,8 @@ Task tool (general-purpose):
 
     **Verify by reading code, not by trusting report.**
 
+    **Non-blocking observations:** If you notice optional improvements (docs, spec clarity, future hardening) that are **not** spec violations, you may list them under **Suggestions**. For each suggestion worth tracking, **prefer** creating a VOM ticket: `vom new "<title>" "<description>"` from repo root (see `.cursor/skills/vom-new/SKILL.md`), or output **VOM ticket drafts** (Title + Description) if you cannot run the shell. Do not use tickets to replace listing **missing or extra spec requirements** — those belong in ❌ Issues until fixed.
+
     Report:
     - ✅ Spec compliant (if everything matches after code inspection)
     - ❌ Issues found: [list specifically what's missing or extra, with file:line references]

@@ -116,7 +116,7 @@ describe('jwt-access', () => {
     await expect(verifyAccessToken(token)).rejects.toBeInstanceOf(JwtAccessSecretMissingError);
   });
 
-  test('sign in production without JWT_SECRET throws clearly', async () => {
+  test('sign without JWT_SECRET throws even when NODE_ENV is production', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.JWT_SECRET;
     process.env.JWT_EXPIRES_IN = '3600';

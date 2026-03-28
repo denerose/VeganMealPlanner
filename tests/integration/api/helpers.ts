@@ -13,6 +13,7 @@ export async function seedHouseholdUser(): Promise<SeedHouseholdUserResult> {
   const user = await prisma.user.create({
     data: {
       email: `${suffix}@integration.test`,
+      passwordHash: null,
       displayName: `U-${suffix}`,
     },
   });
@@ -27,6 +28,7 @@ export async function seedHouseholdUser(): Promise<SeedHouseholdUserResult> {
  * Keeps the household, membership, and user (use between tests in a describe block).
  */
 export async function resetHouseholdIntegrationData(householdId: string): Promise<void> {
+  await prisma.householdInvitation.deleteMany({ where: { householdId } });
   await prisma.dayPlan.deleteMany({ where: { householdId } });
   await prisma.meal.deleteMany({ where: { householdId } });
   await prisma.ingredient.deleteMany({ where: { householdId } });

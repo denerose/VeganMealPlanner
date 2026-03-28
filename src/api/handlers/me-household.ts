@@ -31,6 +31,7 @@ export async function handleGetMe(ctx: ApiContext): Promise<Response> {
   const body: MeResponseDto = {
     user: {
       id: toUserId(row.id),
+      email: row.email,
       displayName: row.displayName,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -41,6 +42,7 @@ export async function handleGetMe(ctx: ApiContext): Promise<Response> {
       createdAt: h.createdAt.toISOString(),
       updatedAt: h.updatedAt.toISOString(),
     },
+    membershipRole: m.role,
   };
   return Response.json(body);
 }
@@ -55,6 +57,7 @@ export async function handlePatchMe(req: Request, ctx: ApiContext): Promise<Resp
   });
   return Response.json({
     id: updated.id,
+    email: updated.email,
     displayName: updated.displayName,
     createdAt: updated.createdAt.toISOString(),
     updatedAt: updated.updatedAt.toISOString(),
@@ -98,6 +101,7 @@ export async function handleGetHouseholdMembers(ctx: ApiContext): Promise<Respon
     members.map((m) => ({
       userId: m.userId,
       displayName: m.user.displayName,
+      role: m.role,
     }))
   );
 }

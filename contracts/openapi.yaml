@@ -8,8 +8,10 @@ info:
     **Undocumented** `/api/*` paths receive **404** with an **empty** body. A **documented** `/api/*` path with a **disallowed** HTTP method receives **405** with an **`Allow`** header listing supported methods.
 
     **Authentication:** Protected routes require either:
-    - `Authorization: Bearer <JWT>` whose payload includes `sub` (user id, UUID), or
+    - `Authorization: Bearer <JWT>` — **signed** HS256 access token issued by this API; `sub` is the user id (UUID); verify signature and `exp` in production, or
     - When `AUTH_MODE=development`, `X-Dev-User-Id: <user-uuid>` (JWT not required).
+
+    **Public routes:** `GET /api/health`, `POST /api/auth/register`, and `POST /api/auth/login` do not require authentication. `POST /api/auth/logout` requires identity (Bearer or dev header) but not household tenancy.
 
     JSON error bodies use `{ "code": string, "message"?: string }` unless noted.
 
@@ -40,6 +42,103 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthError'
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new account (create household or join via invite)
+      operationId: postAuthRegister
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      operationId: postAuthLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out (client discards token; server no-op in MVP)
+      operationId: postAuthLogout
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            examples:
+              empty:
+                summary: Empty JSON object
+                value: {}
+      responses:
+        '204':
+          description: No content
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/household/invitations:
+    post:
+      tags: [Household]
+      summary: Create a household invitation (plaintext token returned once)
+      operationId: postHouseholdInvitations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HouseholdInvitationCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdInvitationCreated'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenUserNotInHousehold'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
 
   /api/me:
     get:
@@ -590,7 +689,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT; payload must include `sub` (user id, UUID).
+      description: |
+        Signed HS256 access JWT issued by this API after register/login.
+        Claims include `sub` (user id, UUID), `iat`, and `exp`. The server verifies
+        signature and expiry when `AUTH_MODE` is not `development`.
     devUserId:
       type: apiKey
       in: header
@@ -719,10 +821,123 @@ components:
           enum:
             - error
 
+    HouseholdRole:
+      type: string
+      enum:
+        - OWNER
+        - MEMBER
+
+    AuthUserSummary:
+      type: object
+      required:
+        - id
+        - email
+        - displayName
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+          nullable: true
+
+    AuthTokenResponse:
+      type: object
+      required:
+        - accessToken
+        - tokenType
+        - expiresIn
+        - user
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum:
+            - Bearer
+        expiresIn:
+          type: integer
+          description: Access token lifetime in seconds
+        user:
+          $ref: '#/components/schemas/AuthUserSummary'
+
+    AuthRegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          description: Normalized (trim + lowercase) by the server
+        password:
+          type: string
+          minLength: 10
+          description: Minimum 10 characters
+        displayName:
+          type: string
+          nullable: true
+        householdName:
+          type: string
+          nullable: true
+          description: When creating a household; defaults to "Home" if omitted. Mutually exclusive with `householdInviteToken`.
+        householdInviteToken:
+          type: string
+          description: When joining via invite; mutually exclusive with `householdName`.
+
+    AuthLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    HouseholdInvitationCreate:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+        expiresInHours:
+          type: integer
+          minimum: 1
+          maximum: 168
+          default: 168
+          description: Hours until the invite expires (max 168)
+
+    HouseholdInvitationCreated:
+      type: object
+      required:
+        - token
+        - expiresAt
+        - email
+        - householdId
+      properties:
+        token:
+          type: string
+          description: Plaintext secret; returned only in this response; store hashed server-side
+        expiresAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        householdId:
+          type: string
+          format: uuid
+
     UserPublic:
       type: object
       required:
         - id
+        - email
         - displayName
         - createdAt
         - updatedAt
@@ -730,6 +945,9 @@ components:
         id:
           type: string
           format: uuid
+        email:
+          type: string
+          format: email
         displayName:
           type: string
           nullable: true
@@ -780,6 +998,7 @@ components:
       required:
         - userId
         - displayName
+        - role
       properties:
         userId:
           type: string
@@ -787,17 +1006,22 @@ components:
         displayName:
           type: string
           nullable: true
+        role:
+          $ref: '#/components/schemas/HouseholdRole'
 
     MeResponse:
       type: object
       required:
         - user
         - household
+        - membershipRole
       properties:
         user:
           $ref: '#/components/schemas/UserPublic'
         household:
           $ref: '#/components/schemas/Household'
+        membershipRole:
+          $ref: '#/components/schemas/HouseholdRole'
 
     IngredientStorageType:
       type: string

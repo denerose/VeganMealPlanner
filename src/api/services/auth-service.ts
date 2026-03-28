@@ -1,9 +1,10 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import type { AuthTokenEnvelopeDto } from '../../domain/dtos/auth';
 import { toUserId } from '../../domain/types/ids';
 import { normalizeEmail } from '../../domain/lib/normalize-email';
 import { ApiProblem } from '../api-problem';
+import { hashInviteTokenPlaintext } from '../lib/invite-token-hash';
 import { hashPassword, verifyPassword } from '../password';
 import { signAccessToken } from '../jwt-access';
 
@@ -42,10 +43,6 @@ function timingSafeEqualUtf8(a: string, b: string): boolean {
   const bb = Buffer.from(b, 'utf8');
   if (ba.length !== bb.length) return false;
   return timingSafeEqual(ba, bb);
-}
-
-function sha256HexUtf8(plaintext: string): string {
-  return createHash('sha256').update(plaintext, 'utf8').digest('hex');
 }
 
 function requireObject(body: unknown): Record<string, unknown> {
@@ -214,7 +211,7 @@ export async function register(prisma: PrismaClient, body: unknown): Promise<Aut
     }
   }
 
-  const tokenHash = sha256HexUtf8(parsed.inviteToken);
+  const tokenHash = hashInviteTokenPlaintext(parsed.inviteToken);
   try {
     const user = await prisma.$transaction(async (tx) => {
       const invite = await tx.householdInvitation.findUnique({

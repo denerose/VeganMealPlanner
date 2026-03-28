@@ -16,6 +16,7 @@ import {
   handlePatchIngredient,
   handlePostIngredient,
 } from './handlers/ingredients';
+import { handlePostHouseholdInvitation } from './handlers/household-invitations';
 import {
   bulkUpsertDayPlans,
   createDayPlan,
@@ -43,6 +44,11 @@ export function apiAllowedMethodsForPathname(pathname: string): string[] | null 
   const segs = segments(pathname);
   if (segs[0] !== 'api') return null;
   const rest = segs.slice(1);
+
+  if (rest.length === 2 && rest[0] === 'auth' && rest[1] === 'register') return ['POST'];
+  if (rest.length === 2 && rest[0] === 'auth' && rest[1] === 'login') return ['POST'];
+  if (rest.length === 2 && rest[0] === 'auth' && rest[1] === 'logout') return ['POST'];
+  if (rest.length === 2 && rest[0] === 'household' && rest[1] === 'invitations') return ['POST'];
 
   if (rest.length === 1 && rest[0] === 'me') return ['GET', 'PATCH'];
   if (rest.length === 1 && rest[0] === 'household') return ['GET', 'PATCH'];
@@ -104,6 +110,12 @@ export function dispatchApi(
   // /api/household/members
   if (rest.length === 2 && rest[0] === 'household' && rest[1] === 'members') {
     if (method === 'GET') return wrap(() => handleGetHouseholdMembers(ctx));
+    return Promise.resolve(null);
+  }
+
+  // /api/household/invitations
+  if (rest.length === 2 && rest[0] === 'household' && rest[1] === 'invitations') {
+    if (method === 'POST') return wrap(() => handlePostHouseholdInvitation(req, ctx));
     return Promise.resolve(null);
   }
 

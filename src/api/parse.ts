@@ -9,6 +9,19 @@ export async function readJsonBody<T>(req: Request): Promise<T> {
   }
 }
 
+/** For routes that accept an empty body or `{}` (e.g. logout). */
+export async function readJsonBodyOrEmpty(req: Request): Promise<unknown> {
+  const text = await req.text();
+  if (!text.trim()) {
+    return {};
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new ApiProblem(422, 'invalid_json', 'Request body must be JSON');
+  }
+}
+
 /** `undefined` = omit filter; `true`/`false` = constrain column */
 export function parseBoolQuery(value: string | null): boolean | undefined {
   if (value === null) return undefined;

@@ -42,10 +42,13 @@ describe('GET /api/me happy path', () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      user: { id: string; displayName: string | null };
+      user: { id: string; email: string; displayName: string | null };
       household: { id: string; name: string | null };
+      membershipRole: string;
     };
     expect(body.user.id).toBe(userId);
+    expect(body.user.email).toBe(`pat-${suffix}@integration.test`);
+    expect(body.membershipRole).toBe('OWNER');
     expect(body.household.id).toBe(householdId);
   });
 });
