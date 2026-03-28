@@ -1,6 +1,6 @@
 # Data model design — Meal library & day plans (MVP)
 
-**Status:** Draft (brainstorming output)  
+**Status:** Ready for implementation planning (reviewed 2026-03-28)  
 **Date:** 2026-03-28  
 **Scope:** TypeScript domain types/DTOs and PostgreSQL (relational) persistence for the Vegan Meal Planner API. No HTTP route definitions in this document; OpenAPI will follow.
 
@@ -38,7 +38,7 @@
 ### `Meal`
 
 - `id` (PK), `householdId` (FK → `Household`)
-- `name` (string), `description` (string)
+- `name` (string), `description` (string) — **non-null** in DB; empty string allowed when the user leaves description blank
 - `recipeUrl` (nullable string)
 - `imageId` (nullable string) — **opaque**; no `Image` / asset table in MVP
 - **Qualities** (boolean columns, default `false`):
@@ -57,7 +57,7 @@ New qualities in the future = **new boolean columns** + migration (explicit trad
 - `storageType` — enum (initial set: e.g. `PANTRY`, `REFRIGERATED`, `FROZEN`, `FRESH`; extend via migration)
 - `perishable` — **boolean** (choose a single default in implementation and document it)
 - `createdAt`, `updatedAt`
-- Uniqueness: **`(householdId, name)`** after app-defined normalization **or** `(householdId, raw name)` if duplicate spellings are accepted — **pick one rule in implementation** and enforce consistently.
+- Uniqueness: **`(householdId, name)`** with **normalization** (trim + consistent case-folding, e.g. lowercase) for comparison and constraint, unless product explicitly allows duplicate spellings (then document the alternate rule in the implementation plan).
 
 ### `MealHeroIngredient` (junction)
 
@@ -80,7 +80,7 @@ New qualities in the future = **new boolean columns** + migration (explicit trad
 - `createdAt`, `updatedAt`
 - Unique **`(householdId, date)`**
 
-**Semantics:** Rows may exist before lunch/dinner are chosen (draft planning). Document that the client (or product rules) supplies **date as `YYYY-MM-DD`** and that a single **timezone policy** applies for “which calendar day” (exact policy: product decision; store date-only in DB).
+**Semantics:** Rows may exist before lunch/dinner are chosen (draft planning). The client supplies **date as `YYYY-MM-DD`**. The DB stores **date only**; the implementation plan must record an explicit default for how that maps to “local calendar day” (e.g. per-household timezone vs fixed offset) so behavior is testable and documented for API clients.
 
 ## API / domain DTO shape (not storage)
 
