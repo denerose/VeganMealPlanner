@@ -33,6 +33,7 @@
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "date-fns": "^4.1.0",
+    "jose": "^6.2.2",
     "pg": "^8.20.0"
   }
 }
