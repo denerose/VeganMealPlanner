@@ -1,6 +1,6 @@
 # REST API design — Vegan Meal Planner (MVP)
 
-**Status:** Draft (pending human review after agent spec pass)  
+**Status:** Ready for human review (agent spec review: Approved)  
 **Date:** 2026-03-28  
 **Scope:** HTTP API shape, auth/tenancy, and route behavior for the meal library and day plans. Aligns with [`docs/data-model.md`](../../data-model.md), Prisma, and [`2026-03-28-data-model-design.md`](2026-03-28-data-model-design.md). Implementation updates `contracts/openapi.yaml` and `src/domain` as routes land.
 
