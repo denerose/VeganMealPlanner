@@ -22,3 +22,7 @@ Use **Bun** (`bunx prisma …`) per project conventions, not `npx`.
 ```
 
 If a migration is wrong, fix it by adjusting the schema and using Prisma’s workflow (e.g. reset in dev, or a new migration from the corrected schema)—never patch migration files manually.
+
+## Subagents and Task workers
+
+**Controllers** (main session) dispatching implementers for schema changes must follow **`subagent-prisma-host-handoff.mdc`**: paste the Prisma handoff instruction into the Task prompt, then run `bunx prisma migrate dev` on the host after **`NEEDS_HOST_PRISMA`**. Implementers follow **`.cursor/skills/prisma-delegate-migrate/SKILL.md`** — schema edits only, handoff block, no `migrate dev` or hand-written SQL under `prisma/migrations/`.

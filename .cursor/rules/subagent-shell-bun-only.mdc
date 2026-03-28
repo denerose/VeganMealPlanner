@@ -1,0 +1,31 @@
+---
+description: Subagents — run shell via Bun/normal shell only; no Python/pty wrappers; stop on interactive prompts.
+alwaysApply: true
+---
+
+# Shell execution (agents and subagents)
+
+## How to run commands
+
+- Use **normal shell** invocations the environment provides (e.g. direct `bun`, `bunx`, `sh`/`zsh` one-liners).
+- Use **`bun`** and **`bunx`** for this repo’s tooling (see also `use-bun-instead-of-node-vite-npm-pnpm.mdc` and `AGENTS.md`).
+- **Do not** drive the terminal with **Python scripts**, **pseudo-TTY (pty)** helpers, **expect**-style automation, or other **wrappers** whose main purpose is to fake typing or feed answers to prompts.
+
+```text
+❌ BAD — python -c "import pty; ..." or scripts that attach a pty to automate CLI
+❌ BAD — subprocess/spawn wrappers whose goal is to bypass or answer interactive prompts
+✅ GOOD — bun run check, bunx prisma migrate dev (when non-interactive / documented flags apply)
+```
+
+## Interactive tooling
+
+If a command would **block on prompts** (name a migration, confirm reset, choose an option, login, etc.):
+
+1. **Stop** and **tell the human** what command is needed and what interaction it requires.
+2. **Do not** pipe answers, use `--yes` blindly where it is unsafe, or automate the prompt.
+
+This applies especially to **Prisma** and similar CLIs when the correct workflow is unclear or destructive.
+
+## tmux
+
+You **may** use **tmux** when it genuinely helps (long-running sessions, attach/detach). Still follow the rules above inside tmux: no Python/pty automation to fake interactive CLIs.

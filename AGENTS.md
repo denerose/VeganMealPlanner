@@ -24,6 +24,7 @@ See [README.md](README.md) for more.
   - **vom-self-review** — review recent work and create/update tickets for friction
   - **vom-tidy** — move done tickets to `tickets/done` (or run `./scripts/vom-tidy.sh` from repo root)
   - **vom-open-plan** — open the implementation plan for a VOM ticket (e.g. "open plan for TKT-017", or "open the plan" when a ticket is already in context)
+  - **prisma-delegate-migrate** — subagents/Task workers edit `schema.prisma` only and hand off `bunx prisma migrate dev` to the host; see `.cursor/skills/prisma-delegate-migrate/SKILL.md` and rule `subagent-prisma-host-handoff.mdc`
 - **Vegan branding in ephemera:** Keep examples, seed data, test fixtures, OpenAPI samples, doc snippets, and any other non-production copy aligned with the app’s purpose: **plant-based / vegan food only**. Do not use animal products, non-vegan dishes, or messaging that conflicts with vegan principles in sample names, ingredient lists, or placeholder text.
 
 Prefer Bun over Node, npm, pnpm, etc., per project rules.
