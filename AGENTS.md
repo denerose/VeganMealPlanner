@@ -11,7 +11,7 @@ This project uses **Bun** as the runtime.
 - **Lint:** `bun run lint` — **Format:** `bun run format` / `bun run format:check`
 - **All checks:** `./scripts/check.sh` (or `bun run check`) runs format check, lint, typecheck, and tests and only prints failures—use it for verification to keep context clean.
 
-**API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`.
+**API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`. **Testing conventions and integration fixtures:** [TESTING.md](TESTING.md).
 
 See [README.md](README.md) for more.
 
@@ -24,6 +24,7 @@ See [README.md](README.md) for more.
   - **vom-self-review** — review recent work and create/update tickets for friction
   - **vom-tidy** — move done tickets to `tickets/done` (or run `./scripts/vom-tidy.sh` from repo root)
   - **vom-open-plan** — open the implementation plan for a VOM ticket (e.g. "open plan for TKT-017", or "open the plan" when a ticket is already in context)
+- **Vegan branding in ephemera:** Keep examples, seed data, test fixtures, OpenAPI samples, doc snippets, and any other non-production copy aligned with the app’s purpose: **plant-based / vegan food only**. Do not use animal products, non-vegan dishes, or messaging that conflicts with vegan principles in sample names, ingredient lists, or placeholder text.
 
 Prefer Bun over Node, npm, pnpm, etc., per project rules.
 

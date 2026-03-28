@@ -29,6 +29,14 @@ describe('GET /api/health', () => {
     expect(body).toEqual({ status: 'error' });
   });
 
+  test('non-GET returns 405 with Allow header', async () => {
+    const mockPrisma: PrismaLike = { $connect: () => Promise.resolve() };
+    const handler = createFetchHandler(asPrismaClient(mockPrisma));
+    const res = await handler(new Request('http://localhost/api/health', { method: 'DELETE' }));
+    expect(res.status).toBe(405);
+    expect(res.headers.get('Allow')).toBe('GET');
+  });
+
   test('response has JSON body with status field', async () => {
     const mockPrisma: PrismaLike = { $connect: () => Promise.resolve() };
     const handler = createFetchHandler(asPrismaClient(mockPrisma));

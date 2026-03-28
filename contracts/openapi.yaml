@@ -5,13 +5,17 @@ info:
   description: |
     HTTP API for Vegan Meal Planner (REST MVP).
 
-    **Undocumented** paths or methods receive **404** with an **empty** body.
+    **Undocumented** `/api/*` paths receive **404** with an **empty** body. A **documented** `/api/*` path with a **disallowed** HTTP method receives **405** with an **`Allow`** header listing supported methods.
 
     **Authentication:** Protected routes require either:
     - `Authorization: Bearer <JWT>` whose payload includes `sub` (user id, UUID), or
     - When `AUTH_MODE=development`, `X-Dev-User-Id: <user-uuid>` (JWT not required).
 
     JSON error bodies use `{ "code": string, "message"?: string }` unless noted.
+
+    **Tenancy:** After authentication, the server resolves the caller's household from `HouseholdMembership`.
+    If the user has **more than one** membership row, the API responds with **409** and `code: multiple_memberships`
+    (this is distinct from **403** `user_not_in_household`, which means **zero** memberships).
 servers:
   - url: /
 security:
@@ -329,6 +333,33 @@ paths:
             format: date
             example: '2026-03-15'
           description: Calendar day YYYY-MM-DD
+        - name: makesLeftovers
+          in: query
+          schema:
+            type: boolean
+          description: Optional; same semantics as GET /api/meals list filters.
+        - name: isGreasy
+          in: query
+          schema:
+            type: boolean
+        - name: isCreamy
+          in: query
+          schema:
+            type: boolean
+        - name: isAcidic
+          in: query
+          schema:
+            type: boolean
+        - name: heroIngredientId
+          in: query
+          description: Repeat query key for AND; meal must include all listed hero ingredients.
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          style: form
+          explode: true
       responses:
         '200':
           description: OK
@@ -612,7 +643,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorBody'
     ForbiddenUserNotInHousehold:
-      description: Authenticated user has no household membership (or multiple)
+      description: Authenticated user has no household membership
       content:
         application/json:
           schema:
@@ -621,6 +652,17 @@ components:
             user_not_in_household:
               value:
                 code: user_not_in_household
+    MultipleHouseholdMemberships:
+      description: Authenticated user has more than one household membership
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            multiple_memberships:
+              value:
+                code: multiple_memberships
+                message: User has more than one household membership
     NotFound:
       description: Resource not found
       content:
@@ -633,6 +675,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorBody'
+          examples:
+            ingredient_name_conflict:
+              summary: Duplicate normalized ingredient name in household
+              value:
+                code: ingredient_name_conflict
+                message: An ingredient with this name already exists in the household
     Unprocessable:
       description: Validation error
       content:

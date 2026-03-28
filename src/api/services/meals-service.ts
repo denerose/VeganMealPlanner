@@ -9,6 +9,7 @@ import {
 } from '../parse';
 import { ApiProblem } from '../api-problem';
 import { rethrowPrisma } from './prisma-map';
+import { isUuid } from '../uuid';
 import type { MealCreateDto, MealUpdateDto } from '../../domain/dtos/meal';
 import { readJsonBody } from '../parse';
 import { previousPlanYmd, nextPlanYmd } from '../../domain/lib/adjacent-plan-dates';
@@ -109,6 +110,11 @@ function mealWhereFromUrl(url: URL, householdId: string): Prisma.MealWhereInput 
     }
   }
   const heroIds = collectHeroIngredientIds(url.searchParams);
+  for (const id of heroIds) {
+    if (!isUuid(id)) {
+      throw new ApiProblem(422, 'invalid_query', `heroIngredientId must be a valid UUID: ${id}`);
+    }
+  }
   if (heroIds.length > 0) {
     where.AND = heroIds.map((id) => ({
       heroIngredients: { some: { ingredientId: id } },
@@ -317,10 +323,9 @@ export async function randomMeal(url: URL, ctx: ApiContext): Promise<Response> {
   for (const p of adj) {
     if (p.dinnerMealId) exclude.add(p.dinnerMealId);
   }
-  const where: Prisma.MealWhereInput = {
-    householdId: ctx.householdId,
-    ...(exclude.size > 0 ? { id: { notIn: [...exclude] } } : {}),
-  };
+  const filterWhere = mealWhereFromUrl(url, ctx.householdId);
+  const where: Prisma.MealWhereInput =
+    exclude.size > 0 ? { AND: [filterWhere, { id: { notIn: [...exclude] } }] } : filterWhere;
   const candidates = await ctx.prisma.meal.findMany({
     where,
     select: { id: true },

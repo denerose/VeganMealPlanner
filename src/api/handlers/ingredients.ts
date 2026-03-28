@@ -1,30 +1,11 @@
 import { Prisma, type IngredientStorageType } from '@prisma/client';
 import type { IngredientCreateDto, IngredientUpdateDto } from '../../domain/dtos/ingredient';
+import { toIngredientResponseDto } from '../../domain/mappers/ingredient-mapper';
 import type { ApiContext } from './me-household';
 import { readJsonBody, parseLimitOffset } from '../parse';
 import { normalizeIngredientName } from '../../domain/lib/normalize-ingredient-name';
 import { ApiProblem } from '../api-problem';
 import { rethrowPrisma } from '../services/prisma-map';
-
-function toResponse(row: {
-  id: string;
-  householdId: string;
-  name: string;
-  storageType: IngredientStorageType;
-  perishable: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: row.id,
-    householdId: row.householdId,
-    name: row.name,
-    storageType: row.storageType,
-    perishable: row.perishable,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
 
 export async function handleListIngredients(url: URL, ctx: ApiContext): Promise<Response> {
   const { limit, offset } = parseLimitOffset(url);
@@ -34,7 +15,7 @@ export async function handleListIngredients(url: URL, ctx: ApiContext): Promise<
     take: limit,
     skip: offset,
   });
-  return Response.json(rows.map(toResponse));
+  return Response.json(rows.map(toIngredientResponseDto));
 }
 
 export async function handlePostIngredient(req: Request, ctx: ApiContext): Promise<Response> {
@@ -55,8 +36,15 @@ export async function handlePostIngredient(req: Request, ctx: ApiContext): Promi
         perishable: dto.perishable ?? false,
       },
     });
-    return Response.json(toResponse(row), { status: 201 });
+    return Response.json(toIngredientResponseDto(row), { status: 201 });
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw new ApiProblem(
+        409,
+        'ingredient_name_conflict',
+        'An ingredient with this name already exists in the household'
+      );
+    }
     rethrowPrisma(e);
   }
 }
@@ -71,7 +59,7 @@ export async function handleGetIngredient(
   if (!row) {
     throw new ApiProblem(404, 'not_found', 'Ingredient not found');
   }
-  return Response.json(toResponse(row));
+  return Response.json(toIngredientResponseDto(row));
 }
 
 export async function handlePatchIngredient(
@@ -102,8 +90,15 @@ export async function handlePatchIngredient(
       where: { id: ingredientId },
       data,
     });
-    return Response.json(toResponse(row));
+    return Response.json(toIngredientResponseDto(row));
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw new ApiProblem(
+        409,
+        'ingredient_name_conflict',
+        'An ingredient with this name already exists in the household'
+      );
+    }
     rethrowPrisma(e);
   }
 }

@@ -1,37 +1,11 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { toDayPlanResponseDto } from '../../domain/mappers/day-plan-mapper';
 import { planDateFromYmd } from '../../domain/lib/plan-date';
 import type { ApiContext } from '../handlers/me-household';
 import { readJsonBody, parseDayPlanRange } from '../parse';
 import { ApiProblem } from '../api-problem';
 import type { DayPlanCreateDto, DayPlanUpdateDto } from '../../domain/dtos/day-plan';
 import { rethrowPrisma } from './prisma-map';
-
-function ymdFromDbDate(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function toPlanResponse(row: {
-  id: string;
-  householdId: string;
-  date: Date;
-  lunchMealId: string | null;
-  dinnerMealId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: row.id,
-    householdId: row.householdId,
-    date: ymdFromDbDate(row.date),
-    lunchMealId: row.lunchMealId,
-    dinnerMealId: row.dinnerMealId,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
 
 async function assertMealsOptional(
   prisma: PrismaClient,
@@ -58,7 +32,7 @@ export async function listDayPlans(url: URL, ctx: ApiContext): Promise<Response>
     },
     orderBy: { date: 'asc' },
   });
-  return Response.json(rows.map(toPlanResponse));
+  return Response.json(rows.map(toDayPlanResponseDto));
 }
 
 export async function createDayPlan(req: Request, ctx: ApiContext): Promise<Response> {
@@ -78,7 +52,7 @@ export async function createDayPlan(req: Request, ctx: ApiContext): Promise<Resp
         dinnerMealId: dto.dinnerMealId !== undefined ? dto.dinnerMealId : null,
       },
     });
-    return Response.json(toPlanResponse(row), { status: 201 });
+    return Response.json(toDayPlanResponseDto(row), { status: 201 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       throw new ApiProblem(409, 'conflict', 'Day plan already exists for this date');
@@ -93,12 +67,17 @@ export async function bulkUpsertDayPlans(req: Request, ctx: ApiContext): Promise
     throw new ApiProblem(422, 'invalid_body', 'Body must be a JSON array');
   }
   const mealIds = new Set<string>();
+  const seenDates = new Set<string>();
   for (const item of body) {
     try {
       planDateFromYmd(item.date);
     } catch {
       throw new ApiProblem(422, 'invalid_body', `Invalid date: ${item.date}`);
     }
+    if (seenDates.has(item.date)) {
+      throw new ApiProblem(422, 'invalid_body', 'Duplicate date in bulk request');
+    }
+    seenDates.add(item.date);
     if (item.lunchMealId) mealIds.add(item.lunchMealId);
     if (item.dinnerMealId) mealIds.add(item.dinnerMealId);
   }
@@ -141,7 +120,7 @@ export async function bulkUpsertDayPlans(req: Request, ctx: ApiContext): Promise
         });
       })
     );
-    return Response.json(rows.map(toPlanResponse));
+    return Response.json(rows.map(toDayPlanResponseDto));
   } catch (e) {
     rethrowPrisma(e);
   }
@@ -152,7 +131,7 @@ export async function getDayPlan(id: string, ctx: ApiContext): Promise<Response>
     where: { id, householdId: ctx.householdId },
   });
   if (!row) throw new ApiProblem(404, 'not_found', 'Day plan not found');
-  return Response.json(toPlanResponse(row));
+  return Response.json(toDayPlanResponseDto(row));
 }
 
 export async function patchDayPlan(id: string, req: Request, ctx: ApiContext): Promise<Response> {
@@ -169,7 +148,7 @@ export async function patchDayPlan(id: string, req: Request, ctx: ApiContext): P
       dinnerMealId: dto.dinnerMealId === undefined ? undefined : dto.dinnerMealId,
     },
   });
-  return Response.json(toPlanResponse(row));
+  return Response.json(toDayPlanResponseDto(row));
 }
 
 export async function deleteDayPlan(id: string, ctx: ApiContext): Promise<Response> {

@@ -12,4 +12,11 @@ describe('planDateFromYmd', () => {
     expect(() => planDateFromYmd('2026-3-15')).toThrow(RangeError);
     expect(() => planDateFromYmd('')).toThrow(RangeError);
   });
+
+  test('throws on invalid calendar day', () => {
+    expect(() => planDateFromYmd('2026-02-31')).toThrow(RangeError);
+    expect(() => planDateFromYmd('2026-04-31')).toThrow(RangeError);
+    expect(() => planDateFromYmd('2024-02-29')).not.toThrow();
+    expect(() => planDateFromYmd('2026-02-29')).toThrow(RangeError);
+  });
 });

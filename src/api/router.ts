@@ -32,10 +32,36 @@ import {
   randomMeal,
   updateMeal,
 } from './services/meals-service';
-import { isUuid } from './auth';
+import { isUuid } from './uuid';
 
 function segments(pathname: string): string[] {
   return pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+}
+
+/** For 405 responses: allowed methods for this documented `/api/*` path, or `null` if unknown. */
+export function apiAllowedMethodsForPathname(pathname: string): string[] | null {
+  const segs = segments(pathname);
+  if (segs[0] !== 'api') return null;
+  const rest = segs.slice(1);
+
+  if (rest.length === 1 && rest[0] === 'me') return ['GET', 'PATCH'];
+  if (rest.length === 1 && rest[0] === 'household') return ['GET', 'PATCH'];
+  if (rest.length === 2 && rest[0] === 'household' && rest[1] === 'members') return ['GET'];
+  if (rest.length === 1 && rest[0] === 'ingredients') return ['GET', 'POST'];
+  if (rest.length === 2 && rest[0] === 'ingredients' && isUuid(rest[1]!)) {
+    return ['GET', 'PATCH', 'DELETE'];
+  }
+  if (rest.length === 1 && rest[0] === 'meals') return ['GET', 'POST'];
+  if (rest.length === 2 && rest[0] === 'meals' && rest[1] === 'random') return ['GET'];
+  if (rest.length === 2 && rest[0] === 'meals' && isUuid(rest[1]!)) {
+    return ['GET', 'PATCH', 'DELETE'];
+  }
+  if (rest.length === 1 && rest[0] === 'day-plans') return ['GET', 'POST'];
+  if (rest.length === 2 && rest[0] === 'day-plans' && rest[1] === 'bulk') return ['POST'];
+  if (rest.length === 2 && rest[0] === 'day-plans' && isUuid(rest[1]!)) {
+    return ['GET', 'PATCH', 'DELETE'];
+  }
+  return null;
 }
 
 async function wrap(handler: () => Promise<Response>): Promise<Response> {

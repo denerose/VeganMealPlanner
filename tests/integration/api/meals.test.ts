@@ -1,24 +1,36 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 import { prisma } from '../../../src/lib/prisma';
 import { createFetchHandler } from '../../../src/api/server';
 import { planDateFromYmd } from '../../../src/domain/lib/plan-date';
-import { seedHouseholdUser } from './helpers';
+import {
+  resetHouseholdIntegrationData,
+  type SeedHouseholdUserResult,
+  seedHouseholdUser,
+  teardownHouseholdUser,
+} from './helpers';
 
 const handler = createFetchHandler(prisma);
 
 describe('Meals API (integration)', () => {
   const prevAuth = process.env.AUTH_MODE;
+  let seeded: SeedHouseholdUserResult | undefined;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.AUTH_MODE = 'development';
+    seeded = await seedHouseholdUser();
   });
 
-  afterAll(() => {
+  afterEach(async () => {
+    if (seeded) await resetHouseholdIntegrationData(seeded.householdId);
+  });
+
+  afterAll(async () => {
     process.env.AUTH_MODE = prevAuth;
+    if (seeded) await teardownHouseholdUser(seeded);
   });
 
   test('GET /api/meals/random excludes prior and next day dinners', async () => {
-    const { userId, householdId } = await seedHouseholdUser();
+    const { userId, householdId } = seeded!;
     const m1 = await prisma.meal.create({
       data: { householdId, name: 'PrevDinner', description: '' },
     });
@@ -58,30 +70,78 @@ describe('Meals API (integration)', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { id: string };
     expect(body.id).toBe(m3.id);
+  });
 
-    await prisma.dayPlan.deleteMany({ where: { householdId } });
-    await prisma.meal.deleteMany({ where: { householdId } });
-    await prisma.householdMembership.deleteMany({ where: { householdId } });
-    await prisma.user.delete({ where: { id: userId } });
-    await prisma.household.delete({ where: { id: householdId } });
+  test('POST /api/meals/random returns 405', async () => {
+    const { userId } = seeded!;
+    const res = await handler(
+      new Request('http://localhost/api/meals/random', {
+        method: 'POST',
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(405);
+    expect(res.headers.get('Allow')).toBe('GET');
+  });
+
+  test('GET /api/meals/random respects isGreasy filter', async () => {
+    const { userId, householdId } = seeded!;
+    await prisma.meal.create({
+      data: { householdId, name: 'Greasy', description: '', isGreasy: true },
+    });
+    const clean = await prisma.meal.create({
+      data: { householdId, name: 'Clean', description: '', isGreasy: false },
+    });
+    const d0 = '2026-12-01';
+    const res = await handler(
+      new Request(`http://localhost/api/meals/random?date=${d0}&isGreasy=false`, {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string };
+    expect(body.id).toBe(clean.id);
+  });
+
+  test('GET /api/meals/random returns no_eligible_meals when filter excludes all', async () => {
+    const { userId, householdId } = seeded!;
+    await prisma.meal.create({
+      data: { householdId, name: 'OnlyGreasy', description: '', isGreasy: true },
+    });
+    const res = await handler(
+      new Request('http://localhost/api/meals/random?date=2026-12-02&isGreasy=false', {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe('no_eligible_meals');
+  });
+
+  test('GET /api/meals returns 422 when heroIngredientId is not a UUID', async () => {
+    const { userId } = seeded!;
+    const res = await handler(
+      new Request('http://localhost/api/meals?heroIngredientId=not-a-uuid', {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe('invalid_query');
   });
 
   test('GET /api/meals/random without date returns 422', async () => {
-    const { userId, householdId } = await seedHouseholdUser();
+    const { userId } = seeded!;
     const res = await handler(
       new Request('http://localhost/api/meals/random', {
         headers: { 'X-Dev-User-Id': userId },
       })
     );
     expect(res.status).toBe(422);
-
-    await prisma.householdMembership.deleteMany({ where: { householdId } });
-    await prisma.user.delete({ where: { id: userId } });
-    await prisma.household.delete({ where: { id: householdId } });
   });
 
   test('GET /api/meals/random returns 404 no_eligible_meals when pool empty', async () => {
-    const { userId, householdId } = await seedHouseholdUser();
+    const { userId, householdId } = seeded!;
     const only = await prisma.meal.create({
       data: { householdId, name: 'Solo', description: '' },
     });
@@ -113,16 +173,10 @@ describe('Meals API (integration)', () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe('no_eligible_meals');
-
-    await prisma.dayPlan.deleteMany({ where: { householdId } });
-    await prisma.meal.deleteMany({ where: { householdId } });
-    await prisma.householdMembership.deleteMany({ where: { householdId } });
-    await prisma.user.delete({ where: { id: userId } });
-    await prisma.household.delete({ where: { id: householdId } });
   });
 
   test('POST /api/meals with invalid cookedByUserIds returns 422', async () => {
-    const { userId, householdId } = await seedHouseholdUser();
+    const { userId } = seeded!;
     const res = await handler(
       new Request('http://localhost/api/meals', {
         method: 'POST',
@@ -136,14 +190,10 @@ describe('Meals API (integration)', () => {
     expect(res.status).toBe(422);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe('cooked_by_invalid');
-
-    await prisma.householdMembership.deleteMany({ where: { householdId } });
-    await prisma.user.delete({ where: { id: userId } });
-    await prisma.household.delete({ where: { id: householdId } });
   });
 
   test('DELETE /api/meals returns 409 meal_in_use when linked from day plan', async () => {
-    const { userId, householdId } = await seedHouseholdUser();
+    const { userId, householdId } = seeded!;
     const meal = await prisma.meal.create({
       data: { householdId, name: 'Locked', description: '' },
     });
@@ -165,11 +215,5 @@ describe('Meals API (integration)', () => {
     expect(res.status).toBe(409);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe('meal_in_use');
-
-    await prisma.dayPlan.deleteMany({ where: { householdId } });
-    await prisma.meal.deleteMany({ where: { householdId } });
-    await prisma.householdMembership.deleteMany({ where: { householdId } });
-    await prisma.user.delete({ where: { id: userId } });
-    await prisma.household.delete({ where: { id: householdId } });
   });
 });
