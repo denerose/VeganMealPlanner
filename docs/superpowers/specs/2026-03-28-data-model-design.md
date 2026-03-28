@@ -131,12 +131,12 @@ This spec is the **design record** (rationale, invariants, DTO rules). It is int
 
 ### Sources of truth (by concern)
 
-| Concern | Where it lives | Role |
-|--------|----------------|------|
-| **Tables, columns, enums, indexes** | `prisma/schema.prisma` (and migrations) | Canonical **persistence** shape; must match deployed Postgres. |
+| Concern                                 | Where it lives                                                      | Role                                                                                                                                                                       |
+| --------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tables, columns, enums, indexes**     | `prisma/schema.prisma` (and migrations)                             | Canonical **persistence** shape; must match deployed Postgres.                                                                                                             |
 | **Design intent & cross-cutting rules** | `docs/superpowers/specs/2026-03-28-data-model-design.md` (this doc) | **Why** and **how** (tenancy, nested DTOs vs flat storage, delete rules, date semantics). Update when behavior or product rules change, not only when column names change. |
-| **API-facing types** | `src/domain/` (`types/`, `dtos/`, mappers) | What handlers and clients conceptually exchange; should stay aligned with OpenAPI when routes exist. |
-| **Discovery / quick orientation** | `docs/data-model.md` | Short **index**: entity list, links to the spec and Prisma schema, and a **maintenance** note so contributors know what to update together. |
+| **API-facing types**                    | `src/domain/` (`types/`, `dtos/`, mappers)                          | What handlers and clients conceptually exchange; should stay aligned with OpenAPI when routes exist.                                                                       |
+| **Discovery / quick orientation**       | `docs/data-model.md`                                                | Short **index**: entity list, links to the spec and Prisma schema, and a **maintenance** note so contributors know what to update together.                                |
 
 ### Keeping docs current (process)
 

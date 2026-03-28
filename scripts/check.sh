@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 
 CHECK_NAMES=( "Format" "Lint" "Typecheck" "Tests" )
-CHECK_CMDS=( "bun run format:check" "bun run lint" "bun run typecheck" "bun run test" )
+CHECK_CMDS=( "bun run format:check" "bun run lint" "bun run typecheck" "bun run test:unit" )
 
 for i in "${!CHECK_CMDS[@]}"; do
   name="${CHECK_NAMES[$i]}"

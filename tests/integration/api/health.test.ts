@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { createFetchHandler, type PrismaLike } from '../../src/api/server';
+import { createFetchHandler, type PrismaLike } from '../../../src/api/server';
 
 describe('GET /api/health', () => {
   test("returns 200 and { status: 'ok' } when DB connects", async () => {

@@ -3,7 +3,7 @@ import { mkdtempSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-const REPO_ROOT = join(import.meta.dir, '..');
+const REPO_ROOT = join(import.meta.dir, '../..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'vom-tidy.sh');
 
 function writeTicket(dir: string, state: string) {

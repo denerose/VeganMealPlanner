@@ -11,7 +11,7 @@ This project uses **Bun** as the runtime.
 - **Lint:** `bun run lint` — **Format:** `bun run format` / `bun run format:check`
 - **All checks:** `./scripts/check.sh` (or `bun run check`) runs format check, lint, typecheck, and tests and only prints failures—use it for verification to keep context clean.
 
-**API / backend:** The API runs via `bun run start`. API code lives under `src/api`, tests under `tests/` (e.g. `tests/api/`). The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`.
+**API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`.
 
 See [README.md](README.md) for more.
 

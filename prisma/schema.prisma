@@ -1,12 +1,126 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum IngredientStorageType {
+  PANTRY
+  REFRIGERATED
+  FROZEN
+  FRESH
+}
+
+model Household {
+  id        String   @id @default(uuid())
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships HouseholdMembership[]
+  meals       Meal[]
+  ingredients Ingredient[]
+  dayPlans    DayPlan[]
+}
+
+model User {
+  id          String   @id @default(uuid())
+  displayName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships HouseholdMembership[]
+  mealsCooked MealCookedBy[]
+}
+
+model HouseholdMembership {
+  userId      String
+  householdId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@id([userId, householdId])
+  @@index([householdId])
+}
+
+model Meal {
+  id             String   @id @default(uuid())
+  householdId    String
+  name           String
+  description    String   @default("")
+  recipeUrl      String?
+  imageId        String?
+  makesLeftovers Boolean  @default(false)
+  isGreasy       Boolean  @default(false)
+  isCreamy       Boolean  @default(false)
+  isAcidic       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  heroIngredients MealHeroIngredient[]
+  cookedBy        MealCookedBy[]
+  dayPlansLunch   DayPlan[]            @relation("DayPlanLunchMeal")
+  dayPlansDinner  DayPlan[]            @relation("DayPlanDinnerMeal")
+
+  @@index([householdId])
+}
+
+model Ingredient {
+  id          String                @id @default(uuid())
+  householdId String
+  name        String
+  storageType IngredientStorageType
+  perishable  Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  household Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  mealHeros MealHeroIngredient[]
+
+  @@unique([householdId, name])
+  @@index([householdId])
+}
+
+model MealHeroIngredient {
+  mealId       String
+  ingredientId String
+  sortOrder    Int    @default(0)
+
+  meal       Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+  @@id([mealId, ingredientId])
+  @@index([mealId])
+}
+
+model MealCookedBy {
+  mealId String
+  userId String
+
+  meal Meal @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([mealId, userId])
+  @@index([mealId])
+}
+
+model DayPlan {
+  id           String   @id @default(uuid())
+  householdId  String
+  date         DateTime @db.Date
+  lunchMealId  String?
+  dinnerMealId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  household  Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  lunchMeal  Meal?     @relation("DayPlanLunchMeal", fields: [lunchMealId], references: [id], onDelete: Restrict)
+  dinnerMeal Meal?     @relation("DayPlanDinnerMeal", fields: [dinnerMealId], references: [id], onDelete: Restrict)
+
+  @@unique([householdId, date])
+  @@index([householdId])
 }
