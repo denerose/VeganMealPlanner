@@ -10,9 +10,14 @@ export interface SeedHouseholdUserResult {
 export async function seedHouseholdUser(): Promise<SeedHouseholdUserResult> {
   const suffix = crypto.randomUUID();
   const household = await prisma.household.create({ data: { name: `H-${suffix}` } });
-  const user = await prisma.user.create({ data: { displayName: `U-${suffix}` } });
+  const user = await prisma.user.create({
+    data: {
+      email: `${suffix}@integration.test`,
+      displayName: `U-${suffix}`,
+    },
+  });
   await prisma.householdMembership.create({
-    data: { userId: user.id, householdId: household.id },
+    data: { userId: user.id, householdId: household.id, role: 'OWNER' },
   });
   return { userId: user.id, householdId: household.id, suffix };
 }

@@ -24,10 +24,15 @@ describe('GET /api/me happy path', () => {
     const suffix = crypto.randomUUID();
     const household = await prisma.household.create({ data: { name: `H-${suffix}` } });
     householdId = household.id;
-    const user = await prisma.user.create({ data: { displayName: 'Pat' } });
+    const user = await prisma.user.create({
+      data: {
+        email: `pat-${suffix}@integration.test`,
+        displayName: 'Pat',
+      },
+    });
     userId = user.id;
     await prisma.householdMembership.create({
-      data: { userId, householdId },
+      data: { userId, householdId, role: 'OWNER' },
     });
 
     const res = await handler(
@@ -59,7 +64,12 @@ describe('GET /api/me without membership', () => {
   });
 
   test('403 user_not_in_household', async () => {
-    const u = await prisma.user.create({ data: { displayName: 'Lonely' } });
+    const u = await prisma.user.create({
+      data: {
+        email: `lonely-${crypto.randomUUID()}@integration.test`,
+        displayName: 'Lonely',
+      },
+    });
     strayUserId = u.id;
     const res = await handler(
       new Request('http://localhost/api/me', {

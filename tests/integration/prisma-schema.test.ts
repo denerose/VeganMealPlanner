@@ -21,12 +21,19 @@ describe('Prisma schema (integration)', () => {
       ids.householdId = household.id;
 
       const user = await prisma.user.create({
-        data: { displayName: 'Chef' },
+        data: {
+          email: `chef-${suffix}@integration.test`,
+          displayName: 'Chef',
+        },
       });
       ids.userId = user.id;
 
       await prisma.householdMembership.create({
-        data: { userId: user.id, householdId: household.id },
+        data: {
+          userId: user.id,
+          householdId: household.id,
+          role: 'OWNER',
+        },
       });
 
       const meal = await prisma.meal.create({
