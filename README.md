@@ -26,4 +26,6 @@ The API runs with Bun and uses Prisma and Postgres.
 
 The server listens on port 3000 (or `PORT`). **`GET /api/health`** returns `200` with `{ "status": "ok" }` when the database is reachable, and `503` with `{ "status": "error" }` when it is not.
 
+Protected routes expect **`Authorization: Bearer <JWT>`** with a `sub` claim (user id), or **`AUTH_MODE=development`** with **`X-Dev-User-Id: <uuid>`** (see `.env.example` and `contracts/openapi.yaml`).
+
 The published HTTP contract is **`contracts/openapi.yaml`** (OpenAPI 3). Unit tests validate this spec (`tests/unit/contracts/openapi.test.ts`); run `bun run test:unit` or `./scripts/check.sh` after changing the API or the contract.
