@@ -4,7 +4,11 @@
 **Date:** 2026-03-28  
 **Scope:** First-party **email + password** accounts, **signed JWT** access tokens, **email-bound household invitations**, **`HouseholdMembership` roles** (`OWNER` / `MEMBER`), **development auth override**, and a **`dev-seed`** script. Aligns with [`2026-03-28-rest-api-design.md`](2026-03-28-rest-api-design.md), [`docs/data-model.md`](../../data-model.md), and `prisma/schema.prisma`. **OAuth** is an explicit future extension (see [Non-goals (MVP)](#non-goals-mvp)).
 
-**HTTP status:** Match the REST spec: **validation** (shape, bad email format, weak password policy, malformed token) → **`422`**; auth failures → **`401`**; permission / policy → **`403`**; conflicts → **`409`**.
+**HTTP status:** Align with [`2026-03-28-rest-api-design.md`](2026-03-28-rest-api-design.md):
+
+- **`401`** — **Bearer JWT** missing, malformed as a JWT, bad **signature**, **expired**, or wrong shape for access auth (stable codes, e.g. `invalid_token`).
+- **`422`** — **JSON request body** validation only: email format, password policy, unknown/extra fields per OpenAPI, **invite token** wrong length/format when the server validates format before lookup, and **ambiguous registration body** (see [`POST /api/auth/register`](#post-apiauthregister)).
+- **`403`** / **`409`** — as in the REST spec and the sections below.
 
 ## Goals
 
@@ -89,12 +93,14 @@
 - **`email`**, **`password`**, **`householdInviteToken`**, optional **`displayName`**.
 - **Must not** include **`householdName`** (or any field that implies creating a new household).
 
+**Ambiguous or conflicting body:** If the client sends **both** create-household fields (e.g. **`householdName`**) **and** **`householdInviteToken`**, or the body otherwise does not match exactly one path allowed by OpenAPI → **`422`**, code **`invalid_registration_body`**.
+
 **Processing:**
 
 - Normalize **`email`**.
 - **Password policy** → **`422`** if weak.
 - **Duplicate `email`** → **`409`**, code e.g. `email_taken`.
-- **Join path:** hash token → load invitation where **`usedAt` is null**, **`expiresAt > now`**, **`tokenHash` matches**; if missing → **`422`**, code **`invite_invalid`** (generic message to avoid leaking existence); if **`email`** does not match invitation’s **`email`** → **`422`**, code **`invite_email_mismatch`**.
+- **Join path:** hash token → load invitation where **`usedAt` is null**, **`expiresAt > now`**, **`tokenHash` matches**; if missing or expired → **`422`**, code **`invite_invalid`** (generic message to avoid leaking existence); if **`email`** does not match invitation’s **`email`** → **`422`**, code **`invite_email_mismatch`**. (Contrast **Bearer JWT** errors on protected routes → **`401`**, not **`422`**.)
 - **Transaction:** create **`User`** + **`passwordHash`**; create **`HouseholdMembership`** with **`role = OWNER`** (create path) or **`MEMBER`** (join path); join path also sets invitation **`usedAt` / `usedByUserId`**; create path creates **`Household`**.
 - If the user would violate **single membership** (e.g. race) → **`409`**.
 

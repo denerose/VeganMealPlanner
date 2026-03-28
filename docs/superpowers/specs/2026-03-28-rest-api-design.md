@@ -44,6 +44,7 @@
 ### Public
 
 - **`GET /api/health`** remains **unauthenticated** (existing behavior).
+- **Auth (registration / login):** **`POST /api/auth/register`** and **`POST /api/auth/login`** are **unauthenticated**; full shape and rules are in [`2026-03-28-auth-api-design.md`](2026-03-28-auth-api-design.md).
 
 ## URL layout
 
