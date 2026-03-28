@@ -1,6 +1,6 @@
 ---
 name: vom-reviewer
-model: composer-2-fast
+model: composer-2
 description: VOM implementation reviewer. Use when a VOM ticket is in state review-pending; runs the review workflow and reports approved or changes-requested back to the main agent.
 ---
 

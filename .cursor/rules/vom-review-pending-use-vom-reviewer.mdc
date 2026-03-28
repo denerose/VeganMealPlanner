@@ -1,6 +1,9 @@
 ---
-description: When a VOM ticket is in state review-pending, use the vom-reviewer subagent for implementation review.
-alwaysApply: true
+description: VOM only — if a ticket is review-pending, use vom-reviewer. Applies when .vom tickets, VOM skills, or vom-reviewer agent are in context.
+globs: ".vom/**,.cursor/skills/vom/**,.cursor/skills/vom-new/**,.cursor/skills/vom-open-plan/**,.cursor/skills/vom-self-review/**,.cursor/skills/vom-tidy/**,.cursor/agents/vom-reviewer.md"
+alwaysApply: false
 ---
+
+**Scope:** Follow this when the work involves VOM tickets (files under `.vom/`), `vom` CLI commands, or VOM skills — not as a default for unrelated tasks.
 
 When you are working on a VOM ticket and its state is **review-pending**, invoke the **vom-reviewer** subagent with that ticket ID (e.g. `/vom-reviewer TKT-010`) **immediately in the same response**—do not wait for the user to ask or give further instruction. Do not review and approve the implementation in the same flow; let vom-reviewer run the workflow and report back.

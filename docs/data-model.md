@@ -1,4 +1,4 @@
-# Data model (index)
+# Data model
 
 Use this page to find **where the data model is defined** and **what to update when it changes**. It is independent of any single implementation or VOM plan.
 
@@ -6,8 +6,7 @@ Use this page to find **where the data model is defined** and **what to update w
 
 | Artifact                                                                    | Purpose                                                                                                |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| [Prisma schema](../prisma/schema.prisma)                                    | **Canonical** tables, columns, relations, and enums for PostgreSQL.                                    |
-| [Data model design spec](superpowers/specs/2026-03-28-data-model-design.md) | Design intent: household tenancy, DTO vs storage shape, constraints, testing notes.                    |
+| [Prisma schema](../prisma/schema.prisma)                                    | **Canonical** tables, columns, relations, and enums for PostgreSQL.                                    |               |
 | `src/domain/types/`, `src/domain/dtos/`, `src/domain/mappers/`              | TypeScript IDs, enums, API DTOs, and persistence→DTO mappers (align with OpenAPI as routes are added). |
 
 ## Entities (MVP overview)
@@ -30,8 +29,7 @@ For field-level detail and rules, use the spec and Prisma schema above.
 ## When you change the model
 
 1. **Migrations / `schema.prisma`** — always.
-2. **`docs/data-model.md`** — update this overview if entities, links, or the “what to read” table is no longer accurate.
-3. **Design spec** — update [2026-03-28-data-model-design.md](superpowers/specs/2026-03-28-data-model-design.md) when behavior, invariants, or product rules change (not only for renames).
+2. **`docs/data-model.md`** — update this file whenever the data model changes.
 4. **`src/domain`** and **`contracts/openapi.yaml`** — when types or HTTP contracts are affected.
 
 Same PR as the schema change is ideal so docs never lag behind main.

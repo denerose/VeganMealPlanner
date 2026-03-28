@@ -1,0 +1,24 @@
+---
+description: Never hand-write or edit Prisma migration files; use Prisma CLI to generate migrations.
+alwaysApply: true
+---
+
+# Prisma migrations
+
+Do **not** create, edit, or rewrite anything under `prisma/migrations/` by hand—including `migration.sql`, new migration folders, or renaming migration directories to “fix” history. Let Prisma own generated migration artifacts.
+
+## Do instead
+
+- Change `prisma/schema.prisma` (and related Prisma config only as needed).
+- Run **Prisma commands** so migrations and client stay consistent, for example:
+  - `bunx prisma migrate dev` — create/apply migrations in development
+  - `bunx prisma migrate diff` / `bunx prisma db push` — only when appropriate for the task and environment (prefer migrate dev for versioned migrations)
+
+Use **Bun** (`bunx prisma …`) per project conventions, not `npx`.
+
+```text
+❌ BAD — paste or edit SQL in prisma/migrations/.../migration.sql
+✅ GOOD — update schema.prisma, then bunx prisma migrate dev (or the CLI flow the user asked for)
+```
+
+If a migration is wrong, fix it by adjusting the schema and using Prisma’s workflow (e.g. reset in dev, or a new migration from the corrected schema)—never patch migration files manually.
