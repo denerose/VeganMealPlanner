@@ -4,6 +4,6 @@ export function jsonError(status: number, code: string, message?: string): Respo
     {
       status,
       headers: { 'Content-Type': 'application/json' },
-    },
+    }
   );
 }

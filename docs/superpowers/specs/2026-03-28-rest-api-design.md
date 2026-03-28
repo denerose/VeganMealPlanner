@@ -31,7 +31,7 @@
 ### Production
 
 - Clients send **`Authorization: Bearer <token>`**.
-- Middleware resolves **`userId`** (string matching **`User.id`**). No trusted `userId` in request bodies for *authorization*; values like **`MealCookedBy`** are **data** and must still be validated against the same household.
+- Middleware resolves **`userId`** (string matching **`User.id`**). No trusted `userId` in request bodies for _authorization_; values like **`MealCookedBy`** are **data** and must still be validated against the same household.
 - **Household** for all operations: load **`HouseholdMembership`** for `userId`. **Product rule:** exactly **one** membership per user (not yet enforced by a DB unique on `userId` alone; see [`docs/data-model.md`](../../data-model.md) tenancy — align schema in a follow-up if desired).
   - **Zero** memberships → **`403`** or **`409`** with a stable error code (e.g. `user_not_in_household`).
   - **More than one** → **`500`** in development tooling / **`409`** in production-facing behavior until data and schema enforce uniqueness (optional follow-up: **unique `userId`** on `HouseholdMembership`).
@@ -73,24 +73,24 @@
 
 ### Current user & household
 
-| Method | Path | Purpose |
-|--------|------|--------|
-| `GET` | `/api/me` | **`user`** fields plus **embedded `household`** (id, name, …) from the single membership — one round-trip for shell UIs. |
-| `PATCH` | `/api/me` | e.g. `displayName` (user only). |
-| `GET` | `/api/household` | Household record only (redundant with `/api/me` but kept for simple CRUD symmetry). |
-| `PATCH` | `/api/household` | e.g. `name`. |
-| `GET` | `/api/household/members` | Member list **`{ userId, displayName }`** for **`MealCookedBy`** pickers (same household). |
+| Method  | Path                     | Purpose                                                                                                                  |
+| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `GET`   | `/api/me`                | **`user`** fields plus **embedded `household`** (id, name, …) from the single membership — one round-trip for shell UIs. |
+| `PATCH` | `/api/me`                | e.g. `displayName` (user only).                                                                                          |
+| `GET`   | `/api/household`         | Household record only (redundant with `/api/me` but kept for simple CRUD symmetry).                                      |
+| `PATCH` | `/api/household`         | e.g. `name`.                                                                                                             |
+| `GET`   | `/api/household/members` | Member list **`{ userId, displayName }`** for **`MealCookedBy`** pickers (same household).                               |
 
 ### Meals
 
-| Method | Path | Purpose |
-|--------|------|--------|
-| `GET` | `/api/meals` | List/search: pagination + optional quality filters + hero-ingredient AND filter (see below). |
-| `POST` | `/api/meals` | Create meal; body aligns with domain DTO (nested `qualities`, hero links optional). |
-| `GET` | `/api/meals/{mealId}` | Read one. |
-| `PATCH` | `/api/meals/{mealId}` | Update; may include hero-ingredient list and **`MealCookedBy`** user ids (same-household validation). |
+| Method   | Path                  | Purpose                                                                                                 |
+| -------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/meals`          | List/search: pagination + optional quality filters + hero-ingredient AND filter (see below).            |
+| `POST`   | `/api/meals`          | Create meal; body aligns with domain DTO (nested `qualities`, hero links optional).                     |
+| `GET`    | `/api/meals/{mealId}` | Read one.                                                                                               |
+| `PATCH`  | `/api/meals/{mealId}` | Update; may include hero-ingredient list and **`MealCookedBy`** user ids (same-household validation).   |
 | `DELETE` | `/api/meals/{mealId}` | Delete; if **`DayPlan`** still references meal → **`409`** with stable **`code`** (e.g. `meal_in_use`). |
-| `GET` | `/api/meals/random` | Random eligible meal (**required** `date=YYYY-MM-DD`). |
+| `GET`    | `/api/meals/random`   | Random eligible meal (**required** `date=YYYY-MM-DD`).                                                  |
 
 **`GET /api/meals` filters (query params):**
 
@@ -106,24 +106,24 @@
 
 ### Ingredients
 
-| Method | Path | Purpose |
-|--------|------|--------|
-| `GET` | `/api/ingredients` | List (pagination). |
-| `POST` | `/api/ingredients` | Create: **`name`** (required), **`storageType`** (required enum), **`perishable`** (optional boolean, default per Prisma/data-model). Normalize **`name`** for uniqueness (trim + case-folding) before insert. |
-| `GET` | `/api/ingredients/{ingredientId}` | Read. |
-| `PATCH` | `/api/ingredients/{ingredientId}` | **Partial** update; same fields as create where supplied. |
-| `DELETE` | `/api/ingredients/{ingredientId}` | Delete; if referenced as **meal hero** (**FK RESTRICT**) → **`409`** with e.g. **`code: "ingredient_in_use"`**. |
+| Method   | Path                              | Purpose                                                                                                                                                                                                        |
+| -------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/ingredients`                | List (pagination).                                                                                                                                                                                             |
+| `POST`   | `/api/ingredients`                | Create: **`name`** (required), **`storageType`** (required enum), **`perishable`** (optional boolean, default per Prisma/data-model). Normalize **`name`** for uniqueness (trim + case-folding) before insert. |
+| `GET`    | `/api/ingredients/{ingredientId}` | Read.                                                                                                                                                                                                          |
+| `PATCH`  | `/api/ingredients/{ingredientId}` | **Partial** update; same fields as create where supplied.                                                                                                                                                      |
+| `DELETE` | `/api/ingredients/{ingredientId}` | Delete; if referenced as **meal hero** (**FK RESTRICT**) → **`409`** with e.g. **`code: "ingredient_in_use"`**.                                                                                                |
 
 ### Day plans
 
-| Method | Path | Purpose |
-|--------|------|--------|
-| `GET` | `/api/day-plans?from=&to=` | Inclusive range; validate span cap. |
-| `POST` | `/api/day-plans` | Create **one** plan; **`409`** if **`DayPlan`** already exists for **`(householdId, date)`** (no upsert on this path — use **`PATCH`** or **`POST /bulk`**). |
-| `POST` | `/api/day-plans/bulk` | Body: array of `{ date, lunchMealId?, dinnerMealId? }`. **Idempotent upsert** per `(householdId, date)`. **`422`** if any **`mealId`** is unknown or not in caller’s household. **All-or-nothing** in one transaction (no partial success in v1). |
-| `GET` | `/api/day-plans/{dayPlanId}` | Read by id. |
-| `PATCH` | `/api/day-plans/{dayPlanId}` | Update lunch/dinner ids (same-household meal checks). |
-| `DELETE` | `/api/day-plans/{dayPlanId}` | Delete. |
+| Method   | Path                         | Purpose                                                                                                                                                                                                                                           |
+| -------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/day-plans?from=&to=`   | Inclusive range; validate span cap.                                                                                                                                                                                                               |
+| `POST`   | `/api/day-plans`             | Create **one** plan; **`409`** if **`DayPlan`** already exists for **`(householdId, date)`** (no upsert on this path — use **`PATCH`** or **`POST /bulk`**).                                                                                      |
+| `POST`   | `/api/day-plans/bulk`        | Body: array of `{ date, lunchMealId?, dinnerMealId? }`. **Idempotent upsert** per `(householdId, date)`. **`422`** if any **`mealId`** is unknown or not in caller’s household. **All-or-nothing** in one transaction (no partial success in v1). |
+| `GET`    | `/api/day-plans/{dayPlanId}` | Read by id.                                                                                                                                                                                                                                       |
+| `PATCH`  | `/api/day-plans/{dayPlanId}` | Update lunch/dinner ids (same-household meal checks).                                                                                                                                                                                             |
+| `DELETE` | `/api/day-plans/{dayPlanId}` | Delete.                                                                                                                                                                                                                                           |
 
 **Bulk semantics:** Only dates **present in the request body** are written; no “fill every day in range” in v1. Upsert creates rows with **null** lunch/dinner when omitted.
 

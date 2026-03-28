@@ -4,10 +4,10 @@ Use this page to find **where the data model is defined** and **what to update w
 
 ## Quick links
 
-| Artifact                                                                    | Purpose                                                                                                |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| [Prisma schema](../prisma/schema.prisma)                                    | **Canonical** tables, columns, relations, and enums for PostgreSQL.                                    |               |
-| `src/domain/types/`, `src/domain/dtos/`, `src/domain/mappers/`              | TypeScript IDs, enums, API DTOs, and persistence→DTO mappers (align with OpenAPI as routes are added). |
+| Artifact                                                       | Purpose                                                                                                |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [Prisma schema](../prisma/schema.prisma)                       | **Canonical** tables, columns, relations, and enums for PostgreSQL.                                    |
+| `src/domain/types/`, `src/domain/dtos/`, `src/domain/mappers/` | TypeScript IDs, enums, API DTOs, and persistence→DTO mappers (align with OpenAPI as routes are added). |
 
 ## Entities (MVP overview)
 
@@ -30,7 +30,9 @@ For field-level detail and rules, use the spec and Prisma schema above.
 
 1. **Migrations / `schema.prisma`** — always.
 2. **`docs/data-model.md`** — update this file whenever the data model changes.
-4. **`src/domain`** and **`contracts/openapi.yaml`** — when types or HTTP contracts are affected.
+3. **`src/domain`** and **`contracts/openapi.yaml`** — when types or HTTP contracts are affected.
+
+For **HTTP validation** status codes, the REST API spec ([`docs/superpowers/specs/2026-03-28-rest-api-design.md`](superpowers/specs/2026-03-28-rest-api-design.md)) uses **`422`** for request validation.
 
 Same PR as the schema change is ideal so docs never lag behind main.
 
