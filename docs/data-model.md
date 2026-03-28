@@ -58,7 +58,7 @@ Same PR as the schema change is ideal so docs never lag behind main.
 - `userId` (FK → `User`)
 - `householdId` (FK → `Household`)
 - `role` — enum **`HouseholdRole`**: **`OWNER`**, **`MEMBER`**; Prisma default **`MEMBER`** on create
-- Composite PK / unique pair `(userId, householdId)`
+- Composite primary key `(userId, householdId)`
 
 **API exposure (same enum values as Prisma / OpenAPI `HouseholdRole`):**
 
