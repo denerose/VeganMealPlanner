@@ -12,7 +12,8 @@ Use this page to find **where the data model is defined** and **what to update w
 ## Entities (MVP overview)
 
 - **Household** — tenancy boundary for meals, ingredients, and day plans.
-- **User** — identity; linked via **HouseholdMembership**.
+- **User** — identity (unique **email**, optional **password hash** for first-party auth); linked via **HouseholdMembership**.
+- **HouseholdInvitation** — time-bound invite to join a household by email; plaintext token returned once at creation; stored as **token hash** in the database.
 - **Meal** — library item; flat quality booleans in DB; nested `qualities` in API DTOs; optional `recipeUrl`, opaque `imageId`.
 - **Ingredient** — per-household catalog; `storageType` + `perishable`; linked to meals via **MealHeroIngredient**.
 - **MealCookedBy** — which users cooked a meal (members of the same household).
@@ -47,14 +48,43 @@ Same PR as the schema change is ideal so docs never lag behind main.
 ### `User`
 
 - `id` (PK)
+- `email` — **unique**; normalized for lookups (see auth implementation / OpenAPI)
+- `passwordHash` — **nullable**; Argon2id (or equivalent) digest for first-party login; **never** exposed on HTTP responses
+- `displayName` — optional profile label for UI (e.g. cook pickers)
 - `createdAt`, `updatedAt`
-- Profile fields as needed for MVP (e.g. `displayName`). Auth-specific fields arrive when authentication is implemented.
 
 ### `HouseholdMembership`
 
 - `userId` (FK → `User`)
 - `householdId` (FK → `Household`)
-- Unique `(userId, householdId)`
+- `role` — enum **`HouseholdRole`**: **`OWNER`**, **`MEMBER`**; Prisma default **`MEMBER`** on create
+- Composite PK / unique pair `(userId, householdId)`
+
+**API exposure (same enum values as Prisma / OpenAPI `HouseholdRole`):**
+
+- **`GET /api/me`** — includes **`membershipRole`**: the caller’s role in the resolved household (`OWNER` or `MEMBER`). See `MeResponse` in [`contracts/openapi.yaml`](../contracts/openapi.yaml).
+- **`GET /api/household/members`** — each list item includes **`role`** per member (for cook pickers and permission-aware UIs). See `HouseholdMember` in OpenAPI.
+
+### `HouseholdInvitation`
+
+- `id` (PK)
+- `householdId` (FK → `Household`, cascade delete)
+- `email` — address the invite targets (normalized consistently with registration)
+- `tokenHash` — **unique**; stores a one-way hash of the secret token (the **plaintext token** is returned only in the **`POST /api/household/invitations`** **201** response)
+- `createdByUserId` (FK → `User`, **restrict** on delete)
+- `expiresAt` — invite invalid after this instant
+- `usedAt` — **nullable**; set when an invite is successfully consumed (e.g. register **join** path)
+- `usedByUserId` — **nullable** (FK → `User`, **set null** on delete); user who redeemed the invite
+- `createdAt`
+
+**Lifecycle (conceptual):**
+
+1. **Created** — an authenticated household member calls **`POST /api/household/invitations`**; row inserted with `tokenHash`, `expiresAt`, and optional TTL from request; client receives plaintext **`token`** once.
+2. **Pending** — invite is valid if `usedAt` is null and **now** is before `expiresAt`.
+3. **Consumed** — registration (or equivalent flow) with a valid token sets **`usedAt`** and **`usedByUserId`** and creates a **`HouseholdMembership`** (typically **`MEMBER`**) for the new user.
+4. **Expired / superseded** — unused invites past **`expiresAt`** are rejected; used rows remain for audit (behavior for duplicate invites to the same email is defined in the service layer and OpenAPI error codes).
+
+**Never** return `passwordHash` or invitation `tokenHash` on public HTTP responses; only the one-time **`token`** field on invitation create matches the stored hash at redemption time.
 
 ### `Meal`
 
