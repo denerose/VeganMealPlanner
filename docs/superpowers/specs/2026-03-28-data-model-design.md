@@ -155,4 +155,4 @@ This spec is the **design record** (rationale, invariants, DTO rules). It is int
 
 ## Summary
 
-The MVP relational core is: **Household**, **User**, **HouseholdMembership**, **Meal** (with boolean quality columns and opaque `imageId`), **Ingredient** (with `storageType` + `perishable`), **MealHeroIngredient**, **MealCookedBy**, and **DayPlan** (nullable lunch/dinner, unique per household per date). TypeScript DTOs nest `qualities` for API consumers; persistence stays flat and relational.
+The MVP relational core is: **Household**, **User**, **HouseholdMembership**, **Meal** (with boolean quality columns and opaque `imageId`), **Ingredient** (with `storageType` + `perishable`), **MealHeroIngredient**, **MealCookedBy**, and **DayPlan** (nullable lunch/dinner, unique per household per date). TypeScript DTOs nest `qualities` for API consumers; persistence stays flat and relational. **Repo documentation:** see [Documentation in the repo](#documentation-in-the-repo) and the living index at `docs/data-model.md`.
