@@ -1,0 +1,1321 @@
+openapi: 3.0.3
+info:
+  title: Vegan Meal Planner API
+  version: 0.2.0
+  description: |
+    HTTP API for Vegan Meal Planner (REST MVP).
+
+    **Undocumented** `/api/*` paths receive **404** with an **empty** body. A **documented** `/api/*` path with a **disallowed** HTTP method receives **405** with an **`Allow`** header listing supported methods.
+
+    **Authentication:** Protected routes require either:
+    - `Authorization: Bearer <JWT>` — **signed** HS256 access token issued by this API; `sub` is the user id (UUID); verify signature and `exp` in production, or
+    - When `AUTH_MODE=development`, `X-Dev-User-Id: <user-uuid>` (JWT not required).
+
+    **Public routes:** `GET /api/health`, `POST /api/auth/register`, and `POST /api/auth/login` do not require authentication. `POST /api/auth/logout` requires identity (Bearer or dev header) but not household tenancy.
+
+    JSON error bodies use `{ "code": string, "message"?: string }` unless noted.
+
+    **Tenancy:** After authentication, the server resolves the caller's household from `HouseholdMembership`.
+    If the user has **more than one** membership row, the API responds with **409** and `code: multiple_memberships`
+    (this is distinct from **403** `user_not_in_household`, which means **zero** memberships).
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+  - devUserId: []
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Database is reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthOk'
+        '503':
+          description: Database is not reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthError'
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new account (create household or join via invite)
+      operationId: postAuthRegister
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      operationId: postAuthLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out (client discards token; server no-op in MVP)
+      operationId: postAuthLogout
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            examples:
+              empty:
+                summary: Empty JSON object
+                value: {}
+      responses:
+        '204':
+          description: No content
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/household/invitations:
+    post:
+      tags: [Household]
+      summary: Create a household invitation (plaintext token returned once)
+      operationId: postHouseholdInvitations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HouseholdInvitationCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdInvitationCreated'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenUserNotInHousehold'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/me:
+    get:
+      tags: [User]
+      summary: Current user and household
+      operationId: getMe
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenUserNotInHousehold'
+    patch:
+      tags: [User]
+      summary: Update current user
+      operationId: patchMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPatch'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/household:
+    get:
+      tags: [Household]
+      summary: Current household
+      operationId: getHousehold
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenUserNotInHousehold'
+    patch:
+      tags: [Household]
+      summary: Update household
+      operationId: patchHousehold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HouseholdPatch'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/household/members:
+    get:
+      tags: [Household]
+      summary: Household members (for cook pickers)
+      operationId: getHouseholdMembers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HouseholdMember'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenUserNotInHousehold'
+
+  /api/ingredients:
+    get:
+      tags: [Ingredients]
+      summary: List ingredients
+      operationId: listIngredients
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ingredient'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags: [Ingredients]
+      summary: Create ingredient
+      operationId: createIngredient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/ingredients/{ingredientId}:
+    parameters:
+      - $ref: '#/components/parameters/ingredientId'
+    get:
+      tags: [Ingredients]
+      summary: Get ingredient
+      operationId: getIngredient
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Ingredients]
+      summary: Update ingredient
+      operationId: patchIngredient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngredientPatch'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [Ingredients]
+      summary: Delete ingredient
+      operationId: deleteIngredient
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Ingredient referenced as meal hero
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                ingredient_in_use:
+                  value:
+                    code: ingredient_in_use
+                    message: Ingredient is used as a meal hero
+
+  /api/meals:
+    get:
+      tags: [Meals]
+      summary: List meals (filters + pagination)
+      operationId: listMeals
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+        - name: makesLeftovers
+          in: query
+          schema:
+            type: boolean
+          description: If true/false, constrain to that value; omit for no filter.
+        - name: isGreasy
+          in: query
+          schema:
+            type: boolean
+        - name: isCreamy
+          in: query
+          schema:
+            type: boolean
+        - name: isAcidic
+          in: query
+          schema:
+            type: boolean
+        - name: heroIngredientId
+          in: query
+          description: Repeat query key for AND; meal must include all listed hero ingredients.
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Meal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags: [Meals]
+      summary: Create meal
+      operationId: createMeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/meals/random:
+    get:
+      tags: [Meals]
+      summary: Random meal for a date (excludes prior/next day dinner)
+      operationId: getRandomMeal
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: '2026-03-15'
+          description: Calendar day YYYY-MM-DD
+        - name: makesLeftovers
+          in: query
+          schema:
+            type: boolean
+          description: Optional; same semantics as GET /api/meals list filters.
+        - name: isGreasy
+          in: query
+          schema:
+            type: boolean
+        - name: isCreamy
+          in: query
+          schema:
+            type: boolean
+        - name: isAcidic
+          in: query
+          schema:
+            type: boolean
+        - name: heroIngredientId
+          in: query
+          description: Repeat query key for AND; meal must include all listed hero ingredients.
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No eligible meals or not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                no_eligible_meals:
+                  value:
+                    code: no_eligible_meals
+                    message: No meals available after exclusions
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/meals/{mealId}:
+    parameters:
+      - $ref: '#/components/parameters/mealId'
+    get:
+      tags: [Meals]
+      summary: Get meal
+      operationId: getMeal
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Meals]
+      summary: Update meal
+      operationId: patchMeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealPatch'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [Meals]
+      summary: Delete meal
+      operationId: deleteMeal
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Meal referenced by a day plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              examples:
+                meal_in_use:
+                  value:
+                    code: meal_in_use
+                    message: Meal is referenced by a day plan
+
+  /api/day-plans:
+    get:
+      tags: [DayPlans]
+      summary: List day plans in date range
+      operationId: listDayPlans
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DayPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags: [DayPlans]
+      summary: Create single day plan
+      operationId: createDayPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DayPlanCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/day-plans/bulk:
+    post:
+      tags: [DayPlans]
+      summary: Bulk upsert day plans
+      operationId: bulkUpsertDayPlans
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/DayPlanCreate'
+      responses:
+        '200':
+          description: Upserted plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DayPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/day-plans/{dayPlanId}:
+    parameters:
+      - $ref: '#/components/parameters/dayPlanId'
+    get:
+      tags: [DayPlans]
+      summary: Get day plan
+      operationId: getDayPlan
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [DayPlans]
+      summary: Update day plan lunch/dinner
+      operationId: patchDayPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DayPlanPatch'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags: [DayPlans]
+      summary: Delete day plan
+      operationId: deleteDayPlan
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Signed HS256 access JWT issued by this API after register/login.
+        Claims include `sub` (user id, UUID), `iat`, and `exp`. The server verifies
+        signature and expiry when `AUTH_MODE` is not `development`.
+    devUserId:
+      type: apiKey
+      in: header
+      name: X-Dev-User-Id
+      description: Development only (`AUTH_MODE=development`); value is user UUID.
+
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    mealId:
+      name: mealId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ingredientId:
+      name: ingredientId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    dayPlanId:
+      name: dayPlanId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+    ForbiddenUserNotInHousehold:
+      description: Authenticated user has no household membership
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            user_not_in_household:
+              value:
+                code: user_not_in_household
+    MultipleHouseholdMemberships:
+      description: Authenticated user has more than one household membership
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            multiple_memberships:
+              value:
+                code: multiple_memberships
+                message: User has more than one household membership
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+    Conflict:
+      description: Unique constraint or business conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            ingredient_name_conflict:
+              summary: Duplicate normalized ingredient name in household
+              value:
+                code: ingredient_name_conflict
+                message: An ingredient with this name already exists in the household
+    Unprocessable:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+
+  schemas:
+    ErrorBody:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    HealthOk:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+
+    HealthError:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - error
+
+    HouseholdRole:
+      type: string
+      enum:
+        - OWNER
+        - MEMBER
+
+    AuthUserSummary:
+      type: object
+      required:
+        - id
+        - email
+        - displayName
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+          nullable: true
+
+    AuthTokenResponse:
+      type: object
+      required:
+        - accessToken
+        - tokenType
+        - expiresIn
+        - user
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          enum:
+            - Bearer
+        expiresIn:
+          type: integer
+          description: Access token lifetime in seconds
+        user:
+          $ref: '#/components/schemas/AuthUserSummary'
+
+    AuthRegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          description: Normalized (trim + lowercase) by the server
+        password:
+          type: string
+          minLength: 10
+          description: Minimum 10 characters
+        displayName:
+          type: string
+          nullable: true
+        householdName:
+          type: string
+          nullable: true
+          description: When creating a household; defaults to "Home" if omitted. Mutually exclusive with `householdInviteToken`.
+        householdInviteToken:
+          type: string
+          description: When joining via invite; mutually exclusive with `householdName`.
+
+    AuthLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    HouseholdInvitationCreate:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+        expiresInHours:
+          type: integer
+          minimum: 1
+          maximum: 168
+          default: 168
+          description: Hours until the invite expires (max 168)
+
+    HouseholdInvitationCreated:
+      type: object
+      required:
+        - token
+        - expiresAt
+        - email
+        - householdId
+      properties:
+        token:
+          type: string
+          description: Plaintext secret; returned only in this response; store hashed server-side
+        expiresAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        householdId:
+          type: string
+          format: uuid
+
+    UserPublic:
+      type: object
+      required:
+        - id
+        - email
+        - displayName
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPatch:
+      type: object
+      properties:
+        displayName:
+          type: string
+          nullable: true
+
+    Household:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    HouseholdPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+
+    HouseholdMember:
+      type: object
+      required:
+        - userId
+        - displayName
+        - role
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/HouseholdRole'
+
+    MeResponse:
+      type: object
+      required:
+        - user
+        - household
+        - membershipRole
+      properties:
+        user:
+          $ref: '#/components/schemas/UserPublic'
+        household:
+          $ref: '#/components/schemas/Household'
+        membershipRole:
+          $ref: '#/components/schemas/HouseholdRole'
+
+    IngredientStorageType:
+      type: string
+      enum:
+        - PANTRY
+        - REFRIGERATED
+        - FROZEN
+        - FRESH
+
+    Ingredient:
+      type: object
+      required:
+        - id
+        - householdId
+        - name
+        - storageType
+        - perishable
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        householdId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        storageType:
+          $ref: '#/components/schemas/IngredientStorageType'
+        perishable:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    IngredientCreate:
+      type: object
+      required:
+        - name
+        - storageType
+      properties:
+        name:
+          type: string
+        storageType:
+          $ref: '#/components/schemas/IngredientStorageType'
+        perishable:
+          type: boolean
+          default: false
+
+    IngredientPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        storageType:
+          $ref: '#/components/schemas/IngredientStorageType'
+        perishable:
+          type: boolean
+
+    MealQualities:
+      type: object
+      required:
+        - makesLeftovers
+        - isGreasy
+        - isCreamy
+        - isAcidic
+      properties:
+        makesLeftovers:
+          type: boolean
+        isGreasy:
+          type: boolean
+        isCreamy:
+          type: boolean
+        isAcidic:
+          type: boolean
+
+    MealHeroIngredient:
+      type: object
+      required:
+        - ingredientId
+        - name
+        - storageType
+        - perishable
+        - sortOrder
+      properties:
+        ingredientId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        storageType:
+          $ref: '#/components/schemas/IngredientStorageType'
+        perishable:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    Meal:
+      type: object
+      required:
+        - id
+        - householdId
+        - name
+        - description
+        - recipeUrl
+        - imageId
+        - qualities
+        - heroIngredients
+        - cookedBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        householdId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        recipeUrl:
+          type: string
+          nullable: true
+        imageId:
+          type: string
+          nullable: true
+        qualities:
+          $ref: '#/components/schemas/MealQualities'
+        heroIngredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/MealHeroIngredient'
+        cookedBy:
+          type: array
+          items:
+            type: string
+            format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    HeroIngredientRef:
+      type: object
+      required:
+        - ingredientId
+      properties:
+        ingredientId:
+          type: string
+          format: uuid
+        sortOrder:
+          type: integer
+          default: 0
+
+    MealCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        recipeUrl:
+          type: string
+          nullable: true
+        imageId:
+          type: string
+          nullable: true
+        qualities:
+          type: object
+          properties:
+            makesLeftovers:
+              type: boolean
+            isGreasy:
+              type: boolean
+            isCreamy:
+              type: boolean
+            isAcidic:
+              type: boolean
+        heroIngredientIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/HeroIngredientRef'
+        cookedByUserIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    MealPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        recipeUrl:
+          type: string
+          nullable: true
+        imageId:
+          type: string
+          nullable: true
+        qualities:
+          type: object
+          properties:
+            makesLeftovers:
+              type: boolean
+            isGreasy:
+              type: boolean
+            isCreamy:
+              type: boolean
+            isAcidic:
+              type: boolean
+        heroIngredientIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/HeroIngredientRef'
+        cookedByUserIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    DayPlan:
+      type: object
+      required:
+        - id
+        - householdId
+        - date
+        - lunchMealId
+        - dinnerMealId
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        householdId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+          description: YYYY-MM-DD
+        lunchMealId:
+          type: string
+          format: uuid
+          nullable: true
+        dinnerMealId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DayPlanCreate:
+      type: object
+      required:
+        - date
+      properties:
+        date:
+          type: string
+          format: date
+          description: YYYY-MM-DD
+        lunchMealId:
+          type: string
+          format: uuid
+          nullable: true
+        dinnerMealId:
+          type: string
+          format: uuid
+          nullable: true
+
+    DayPlanPatch:
+      type: object
+      properties:
+        lunchMealId:
+          type: string
+          format: uuid
+          nullable: true
+        dinnerMealId:
+          type: string
+          format: uuid
+          nullable: true

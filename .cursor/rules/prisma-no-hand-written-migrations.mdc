@@ -1,0 +1,28 @@
+---
+description: Never hand-write or edit Prisma migration files; use Prisma CLI to generate migrations.
+alwaysApply: true
+---
+
+# Prisma migrations
+
+Do **not** create, edit, or rewrite anything under `prisma/migrations/` by hand—including `migration.sql`, new migration folders, or renaming migration directories to “fix” history. Let Prisma own generated migration artifacts.
+
+## Do instead
+
+- Change `prisma/schema.prisma` (and related Prisma config only as needed).
+- Run **Prisma commands** so migrations and client stay consistent, for example:
+  - `bunx prisma migrate dev` — create/apply migrations in development
+  - `bunx prisma migrate diff` / `bunx prisma db push` — only when appropriate for the task and environment (prefer migrate dev for versioned migrations)
+
+Use **Bun** (`bunx prisma …`) per project conventions, not `npx`.
+
+```text
+❌ BAD — paste or edit SQL in prisma/migrations/.../migration.sql
+✅ GOOD — update schema.prisma, then bunx prisma migrate dev (or the CLI flow the user asked for)
+```
+
+If a migration is wrong, fix it by adjusting the schema and using Prisma’s workflow (e.g. reset in dev, or a new migration from the corrected schema)—never patch migration files manually.
+
+## Subagents and Task workers
+
+**Controllers** (main session) dispatching implementers for schema changes must follow **`subagent-prisma-host-handoff.mdc`**: paste the Prisma handoff instruction into the Task prompt, then run `bunx prisma migrate dev` on the host after **`NEEDS_HOST_PRISMA`**. Implementers follow **`.cursor/skills/prisma-delegate-migrate/SKILL.md`** — schema edits only, handoff block, no `migrate dev` or hand-written SQL under `prisma/migrations/`.

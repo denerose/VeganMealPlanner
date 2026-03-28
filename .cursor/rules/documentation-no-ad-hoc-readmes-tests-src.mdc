@@ -1,0 +1,18 @@
+---
+description: Do not add README or stray docs under tests/ or src/; use TESTING.md and established doc locations.
+alwaysApply: true
+---
+
+# Documentation placement (tests and source trees)
+
+- **Do not** create `README.md` or other new ad-hoc doc files under `tests/**` or `src/**` unless the **human explicitly requested that exact path** (name and directory).
+- **Testing** conventions, API integration coverage maps, fixture notes, and “which test file covers which endpoint” tables belong in **[TESTING.md](TESTING.md)** at the repo root (new section or subsection), not in a nested README.
+- **Agent/workflow** guidance belongs in **[AGENTS.md](AGENTS.md)**, **[.cursor/rules/](.cursor/rules/)**, or **[.cursor/skills/](.cursor/skills/)** as appropriate.
+- **VOM / ticket acceptance criteria** that say “tests/README” or “document in tests” → satisfy them with **TESTING.md**, a **ticket comment**, or **AGENTS.md**—not a new `tests/**/README.md`.
+- **User-facing or architectural docs** → existing **[README.md](README.md)** or **`docs/`** patterns.
+
+```text
+❌ tests/integration/api/README.md (unless user asked for that file)
+❌ src/api/README.md (unless user asked for that file)
+✅ TESTING.md — "HTTP API integration tests — coverage map"
+```

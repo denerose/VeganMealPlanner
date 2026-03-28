@@ -2,14 +2,40 @@
   "name": "veganmealplanner",
   "module": "index.ts",
   "scripts": {
-    "start": "echo 'Vegan Meal Planner'"
+    "start": "bun run src/api/server.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "bun run test:unit",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "test:all": "bun run test:unit && bun run test:integration",
+    "check": "./scripts/check.sh",
+    "check-all": "./scripts/check-all.sh",
+    "dev-seed": "bun run scripts/dev-seed.ts"
   },
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@apidevtools/swagger-parser": "^11.0.0",
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "latest",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
+    "prisma": "^7.5.0",
+    "typescript-eslint": "^8.57.0"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/client": "^7.5.0",
+    "date-fns": "^4.1.0",
+    "jose": "^6.2.2",
+    "pg": "^8.20.0"
   }
 }

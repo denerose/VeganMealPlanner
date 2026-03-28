@@ -1,0 +1,29 @@
+---
+description: Host agents — when dispatching Task/subagents for Prisma schema or migrate work, inject prisma-delegate-migrate instructions; run migrate on host after NEEDS_HOST_PRISMA.
+alwaysApply: true
+---
+
+# Prisma + subagents (host / controller)
+
+When you use **superpowers subagent-driven-development**, the **Task** tool, or any **subagent** whose work touches **`prisma/schema.prisma`** or **creating/applying migrations**, you are the **host**. Subagent sandboxes often lack a real DB or TTY; subagents must not run `migrate dev` there or hand-write SQL.
+
+## Before each implementer dispatch (paste into the Task prompt)
+
+Include this **verbatim** (or equivalent) in the implementer’s instructions:
+
+```text
+Schema-only in your session for Prisma. For migrations, follow .cursor/skills/prisma-delegate-migrate/SKILL.md: output the PRISMA_HOST_HANDOFF block and report status NEEDS_HOST_PRISMA; do not run migrate dev or write SQL under prisma/migrations/.
+```
+
+## After NEEDS_HOST_PRISMA
+
+1. Run the handed-off commands yourself in a **normal shell** with `DATABASE_URL` and DB up (e.g. podman compose per `AGENTS.md`).
+2. Confirm the new migration folder exists under `prisma/migrations/`.
+3. Continue the workflow (typecheck, next task, or re-dispatch implementer with “migration applied; continue …”).
+
+Do not ask a subagent to “fix” a failed migrate by editing `migration.sql`.
+
+## Related
+
+- Skill: `.cursor/skills/prisma-delegate-migrate/SKILL.md`
+- Rule: `prisma-no-hand-written-migrations.mdc`
