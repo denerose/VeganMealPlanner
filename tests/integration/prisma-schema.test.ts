@@ -6,59 +6,96 @@ import { IngredientStorageType } from '@prisma/client';
 describe('Prisma schema (integration)', () => {
   test('creates household, user, membership, meal, ingredient, day plan', async () => {
     const suffix = crypto.randomUUID();
-    const household = await prisma.household.create({
-      data: { name: `H-${suffix}` },
-    });
-    const user = await prisma.user.create({
-      data: { displayName: 'Chef' },
-    });
-    await prisma.householdMembership.create({
-      data: { userId: user.id, householdId: household.id },
-    });
-    const meal = await prisma.meal.create({
-      data: {
-        householdId: household.id,
-        name: 'Soup',
-        description: '',
-      },
-    });
-    const ing = await prisma.ingredient.create({
-      data: {
-        householdId: household.id,
-        name: `tofu-${suffix}`,
-        storageType: IngredientStorageType.REFRIGERATED,
-        perishable: true,
-      },
-    });
-    await prisma.mealHeroIngredient.create({
-      data: { mealId: meal.id, ingredientId: ing.id, sortOrder: 0 },
-    });
-    await prisma.mealCookedBy.create({
-      data: { mealId: meal.id, userId: user.id },
-    });
-    const plan = await prisma.dayPlan.create({
-      data: {
-        householdId: household.id,
-        date: planDateFromYmd('2026-03-15'),
-        lunchMealId: meal.id,
-        dinnerMealId: null,
-      },
-    });
-    expect(plan.householdId).toBe(household.id);
+    const ids: {
+      planId?: string;
+      mealId?: string;
+      ingredientId?: string;
+      userId?: string;
+      householdId?: string;
+    } = {};
 
-    await prisma.dayPlan.delete({ where: { id: plan.id } });
-    await prisma.mealHeroIngredient.delete({
-      where: { mealId_ingredientId: { mealId: meal.id, ingredientId: ing.id } },
-    });
-    await prisma.mealCookedBy.delete({
-      where: { mealId_userId: { mealId: meal.id, userId: user.id } },
-    });
-    await prisma.meal.delete({ where: { id: meal.id } });
-    await prisma.ingredient.delete({ where: { id: ing.id } });
-    await prisma.householdMembership.delete({
-      where: { userId_householdId: { userId: user.id, householdId: household.id } },
-    });
-    await prisma.user.delete({ where: { id: user.id } });
-    await prisma.household.delete({ where: { id: household.id } });
+    try {
+      const household = await prisma.household.create({
+        data: { name: `H-${suffix}` },
+      });
+      ids.householdId = household.id;
+
+      const user = await prisma.user.create({
+        data: { displayName: 'Chef' },
+      });
+      ids.userId = user.id;
+
+      await prisma.householdMembership.create({
+        data: { userId: user.id, householdId: household.id },
+      });
+
+      const meal = await prisma.meal.create({
+        data: {
+          householdId: household.id,
+          name: 'Soup',
+          description: '',
+        },
+      });
+      ids.mealId = meal.id;
+
+      const ing = await prisma.ingredient.create({
+        data: {
+          householdId: household.id,
+          name: `tofu-${suffix}`,
+          storageType: IngredientStorageType.REFRIGERATED,
+          perishable: true,
+        },
+      });
+      ids.ingredientId = ing.id;
+
+      await prisma.mealHeroIngredient.create({
+        data: { mealId: meal.id, ingredientId: ing.id, sortOrder: 0 },
+      });
+      await prisma.mealCookedBy.create({
+        data: { mealId: meal.id, userId: user.id },
+      });
+
+      const plan = await prisma.dayPlan.create({
+        data: {
+          householdId: household.id,
+          date: planDateFromYmd('2026-03-15'),
+          lunchMealId: meal.id,
+          dinnerMealId: null,
+        },
+      });
+      ids.planId = plan.id;
+
+      expect(plan.householdId).toBe(household.id);
+    } finally {
+      const { planId, mealId, ingredientId, userId, householdId } = ids;
+      if (planId) await prisma.dayPlan.delete({ where: { id: planId } }).catch(() => {});
+      if (mealId && ingredientId) {
+        await prisma.mealHeroIngredient
+          .delete({
+            where: { mealId_ingredientId: { mealId, ingredientId } },
+          })
+          .catch(() => {});
+      }
+      if (mealId && userId) {
+        await prisma.mealCookedBy
+          .delete({
+            where: { mealId_userId: { mealId, userId } },
+          })
+          .catch(() => {});
+      }
+      if (mealId) await prisma.meal.delete({ where: { id: mealId } }).catch(() => {});
+      if (ingredientId)
+        await prisma.ingredient.delete({ where: { id: ingredientId } }).catch(() => {});
+      if (userId && householdId) {
+        await prisma.householdMembership
+          .delete({
+            where: { userId_householdId: { userId, householdId } },
+          })
+          .catch(() => {});
+      }
+      if (userId) await prisma.user.delete({ where: { id: userId } }).catch(() => {});
+      if (householdId)
+        await prisma.household.delete({ where: { id: householdId } }).catch(() => {});
+    }
   });
 });

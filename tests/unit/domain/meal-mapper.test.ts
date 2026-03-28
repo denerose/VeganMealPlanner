@@ -45,4 +45,49 @@ describe('toMealResponseDto', () => {
     expect(dto.id).toEqual(toMealId('m1'));
     expect(dto.householdId).toEqual(toHouseholdId('h1'));
   });
+
+  test('sorts hero ingredients by sortOrder', () => {
+    const dto = toMealResponseDto({
+      meal: {
+        id: 'm1',
+        householdId: 'h1',
+        name: 'Bowl',
+        description: '',
+        recipeUrl: null,
+        imageId: null,
+        makesLeftovers: false,
+        isGreasy: false,
+        isCreamy: false,
+        isAcidic: false,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      heroRows: [
+        {
+          sortOrder: 2,
+          ingredient: {
+            id: 'i2',
+            name: 'second',
+            storageType: IngredientStorageType.FRESH,
+            perishable: true,
+          },
+        },
+        {
+          sortOrder: 0,
+          ingredient: {
+            id: 'i0',
+            name: 'first',
+            storageType: IngredientStorageType.PANTRY,
+            perishable: false,
+          },
+        },
+      ],
+      cookedByUserIds: [],
+    });
+
+    expect(dto.heroIngredients.map((h) => h.ingredientId)).toEqual([
+      toIngredientId('i0'),
+      toIngredientId('i2'),
+    ]);
+  });
 });
