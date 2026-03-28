@@ -84,7 +84,7 @@ describe('Day plans API (integration)', () => {
   });
 
   test('POST /bulk returns 422 when meal not in household', async () => {
-    const { userId, householdId } = seeded!;
+    const { userId } = seeded!;
     const other = await seedHouseholdUser();
     try {
       const foreignMeal = await prisma.meal.create({

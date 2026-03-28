@@ -30,7 +30,7 @@ describe('Ingredients API (integration)', () => {
   });
 
   test('409 on duplicate normalized name', async () => {
-    const { userId, householdId } = seeded!;
+    const { userId } = seeded!;
 
     const headers = { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' };
     const body = JSON.stringify({

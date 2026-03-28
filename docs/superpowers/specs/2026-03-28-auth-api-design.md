@@ -51,17 +51,17 @@
 
 ### `HouseholdInvitation` (new)
 
-| Field              | Purpose |
-| ------------------ | ------- |
-| `id`               | UUID PK |
-| `householdId`      | FK → `Household` |
-| `email`            | Invitee email, **normalized** (trim + lowercase); **required** |
-| `tokenHash`        | Hash of the **secret** token shown once on create (e.g. SHA-256 of raw token, or a dedicated slow hash if desired; **never** store raw token) |
-| `createdByUserId`  | FK → `User` (must be **`MEMBER` or `OWNER`** of `householdId` at creation time) |
-| `expiresAt`        | Instant after which the invite cannot be consumed |
-| `usedAt`           | Nullable; set when consumed |
-| `usedByUserId`     | Nullable; FK → `User` who registered with this invite |
-| `createdAt`        | Audit |
+| Field             | Purpose                                                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | UUID PK                                                                                                                                       |
+| `householdId`     | FK → `Household`                                                                                                                              |
+| `email`           | Invitee email, **normalized** (trim + lowercase); **required**                                                                                |
+| `tokenHash`       | Hash of the **secret** token shown once on create (e.g. SHA-256 of raw token, or a dedicated slow hash if desired; **never** store raw token) |
+| `createdByUserId` | FK → `User` (must be **`MEMBER` or `OWNER`** of `householdId` at creation time)                                                               |
+| `expiresAt`       | Instant after which the invite cannot be consumed                                                                                             |
+| `usedAt`          | Nullable; set when consumed                                                                                                                   |
+| `usedByUserId`    | Nullable; FK → `User` who registered with this invite                                                                                         |
+| `createdAt`       | Audit                                                                                                                                         |
 
 **Semantics:**
 

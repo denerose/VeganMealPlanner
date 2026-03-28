@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { SignJWT } from 'jose';
 import {
+  assertJwtAccessConfigLoaded,
   JwtAccessConfigError,
   JwtAccessSecretMissingError,
   JwtAccessTokenExpiredError,
@@ -61,7 +62,9 @@ describe('jwt-access', () => {
     setJwtEnv(SECRET_A, '3600');
     const { token } = await signAccessToken(USER_ID);
     setJwtEnv(SECRET_B, '3600');
-    await expect(verifyAccessToken(token)).rejects.toBeInstanceOf(JwtAccessTokenInvalidSignatureError);
+    await expect(verifyAccessToken(token)).rejects.toBeInstanceOf(
+      JwtAccessTokenInvalidSignatureError
+    );
   });
 
   test('tampered payload fails verification with invalid signature error', async () => {
@@ -73,7 +76,9 @@ describe('jwt-access', () => {
     const tampered =
       payload.slice(0, -4) + (payload.at(-4) === 'A' ? 'B' : 'A') + payload.slice(-3);
     const badToken = `${parts[0]}.${tampered}.${parts[2]}`;
-    await expect(verifyAccessToken(badToken)).rejects.toBeInstanceOf(JwtAccessTokenInvalidSignatureError);
+    await expect(verifyAccessToken(badToken)).rejects.toBeInstanceOf(
+      JwtAccessTokenInvalidSignatureError
+    );
   });
 
   test('expired token fails with expired error', async () => {
@@ -93,7 +98,9 @@ describe('jwt-access', () => {
       .setIssuedAt(now)
       .setExpirationTime(now + 3600)
       .sign(key);
-    await expect(verifyAccessToken(hs512Token)).rejects.toBeInstanceOf(JwtAccessTokenInvalidAlgorithmError);
+    await expect(verifyAccessToken(hs512Token)).rejects.toBeInstanceOf(
+      JwtAccessTokenInvalidAlgorithmError
+    );
   });
 
   test('sign without JWT_SECRET throws JwtAccessSecretMissingError', async () => {
@@ -125,5 +132,22 @@ describe('jwt-access', () => {
   test('empty token is malformed', async () => {
     setJwtEnv(SECRET_A, '3600');
     await expect(verifyAccessToken('   ')).rejects.toBeInstanceOf(JwtAccessTokenMalformedError);
+  });
+
+  test('assertJwtAccessConfigLoaded passes when env is valid', () => {
+    setJwtEnv(SECRET_A, '3600');
+    expect(() => assertJwtAccessConfigLoaded()).not.toThrow();
+  });
+
+  test('assertJwtAccessConfigLoaded throws when JWT_SECRET missing', () => {
+    delete process.env.JWT_SECRET;
+    process.env.JWT_EXPIRES_IN = '3600';
+    expect(() => assertJwtAccessConfigLoaded()).toThrow(JwtAccessSecretMissingError);
+  });
+
+  test('assertJwtAccessConfigLoaded throws when JWT_EXPIRES_IN missing', () => {
+    process.env.JWT_SECRET = SECRET_A;
+    delete process.env.JWT_EXPIRES_IN;
+    expect(() => assertJwtAccessConfigLoaded()).toThrow(JwtAccessConfigError);
   });
 });
