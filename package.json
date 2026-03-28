@@ -11,7 +11,8 @@
     "test:unit": "bun test tests/unit",
     "test:integration": "bun test tests/integration",
     "test:all": "bun run test:unit && bun run test:integration",
-    "check": "./scripts/check.sh"
+    "check": "./scripts/check.sh",
+    "dev-seed": "bun run scripts/dev-seed.ts"
   },
   "type": "module",
   "private": true,
