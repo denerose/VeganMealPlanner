@@ -1,0 +1,137 @@
+# Data model design — Meal library & day plans (MVP)
+
+**Status:** Draft (brainstorming output)  
+**Date:** 2026-03-28  
+**Scope:** TypeScript domain types/DTOs and PostgreSQL (relational) persistence for the Vegan Meal Planner API. No HTTP route definitions in this document; OpenAPI will follow.
+
+## Goals
+
+- Users manage a **meal library** (CRUD) scoped to a **household**.
+- Users create and update **day plans** for calendar days in a coming period (week, month, etc.): **dinner** always in scope; **lunch** optional. **Breakfast** and **snacks** are out of scope for MVP.
+- Data model aligns with **PostgreSQL** and **Prisma** as the persistence layer; **`src/domain`** holds IDs, enums, and API-oriented DTOs with mappers from persistence.
+
+## Tenancy
+
+- **`Household`** is the tenancy boundary. Meals, ingredients, day plans, and memberships reference **`householdId`**.
+- **`User`** exists as a distinct entity. **`HouseholdMembership`** links `userId` + `householdId` with a unique pair `(userId, householdId)`. Optional `role` may be added later without changing this spec’s core tables.
+
+## Relational model (tables)
+
+### `Household`
+
+- `id` (PK)
+- `createdAt`, `updatedAt`
+- Optional `name` (or similar) for UI — may be deferred to first implementation pass if not needed for MVP.
+
+### `User`
+
+- `id` (PK)
+- `createdAt`, `updatedAt`
+- Profile fields as needed for MVP (e.g. `displayName`). Auth-specific fields arrive when authentication is implemented.
+
+### `HouseholdMembership`
+
+- `userId` (FK → `User`)
+- `householdId` (FK → `Household`)
+- Unique `(userId, householdId)`
+
+### `Meal`
+
+- `id` (PK), `householdId` (FK → `Household`)
+- `name` (string), `description` (string)
+- `recipeUrl` (nullable string)
+- `imageId` (nullable string) — **opaque**; no `Image` / asset table in MVP
+- **Qualities** (boolean columns, default `false`):
+  - `makesLeftovers`
+  - `isGreasy`
+  - `isCreamy`
+  - `isAcidic`
+- `createdAt`, `updatedAt`
+
+New qualities in the future = **new boolean columns** + migration (explicit trade-off for simplicity and query clarity).
+
+### `Ingredient` (household catalog)
+
+- `id` (PK), `householdId` (FK → `Household`)
+- `name` (string)
+- `storageType` — enum (initial set: e.g. `PANTRY`, `REFRIGERATED`, `FROZEN`, `FRESH`; extend via migration)
+- `perishable` — **boolean** (choose a single default in implementation and document it)
+- `createdAt`, `updatedAt`
+- Uniqueness: **`(householdId, name)`** after app-defined normalization **or** `(householdId, raw name)` if duplicate spellings are accepted — **pick one rule in implementation** and enforce consistently.
+
+### `MealHeroIngredient` (junction)
+
+- `mealId` (FK → `Meal`), `ingredientId` (FK → `Ingredient`)
+- `sortOrder` (small integer) for menu-style ordering
+- Unique `(mealId, ingredientId)`
+
+### `MealCookedBy` (junction)
+
+- `mealId` (FK → `Meal`), `userId` (FK → `User`)
+- Unique `(mealId, userId)`
+- **Invariant (application layer):** `userId` must be a member of the meal’s household (`HouseholdMembership`). Same-household checks for meal ↔ day plan links are also enforced in the service layer (Postgres does not express cross-row household equality trivially without triggers).
+
+### `DayPlan`
+
+- `id` (PK), `householdId` (FK → `Household`)
+- `date` — Postgres **`date`** (calendar day only)
+- `lunchMealId` (nullable FK → `Meal`)
+- `dinnerMealId` (nullable FK → `Meal`)
+- `createdAt`, `updatedAt`
+- Unique **`(householdId, date)`**
+
+**Semantics:** Rows may exist before lunch/dinner are chosen (draft planning). Document that the client (or product rules) supplies **date as `YYYY-MM-DD`** and that a single **timezone policy** applies for “which calendar day” (exact policy: product decision; store date-only in DB).
+
+## API / domain DTO shape (not storage)
+
+- **Response DTOs** expose meal **qualities** as a nested object, e.g. `qualities: { makesLeftovers, isGreasy, isCreamy, isAcidic }`, mapped from flat columns.
+- **Hero ingredients** in meal responses: list of `{ ingredientId, name, storageType, perishable, sortOrder }` (or equivalent), resolved via joins through `MealHeroIngredient`.
+- **`cookedBy`:** `UserId[]` in DTOs, backed by `MealCookedBy`.
+- Separate **create** / **update** (partial) DTOs for meals and day plans as needed for the first API slice.
+
+## TypeScript layout (`src/domain`)
+
+- **`types/ids.ts`** — branded string types: `HouseholdId`, `UserId`, `MealId`, `IngredientId`, `DayPlanId` (runtime: string, typically UUID).
+- **`types/enums.ts`** (or split files) — `IngredientStorageType`; meal quality keys remain column-backed until extended.
+- **`dtos/`** — meal, ingredient, day-plan, household/membership as needed; keep HTTP shapes explicit for future OpenAPI alignment.
+- **Mappers** — e.g. `src/domain/mappers/` or colocated with handlers: persistence row + joined data → response DTOs.
+
+**Approach:** Prisma schema is the **persistence** source of truth; **domain DTOs** decouple HTTP/API from raw Prisma shapes (recommended over exposing Prisma types at the edge).
+
+## Integrity, errors, and deletes
+
+- **Foreign keys** on all explicit relations (`householdId`, `mealId`, `ingredientId`, `userId` where applicable).
+- **Cross-household:** validate in services before writes (meal on day plan belongs to same household as day plan; cooks are household members).
+- **Deleting a `Meal` referenced by `DayPlan`:** MVP default **`RESTRICT`** (delete fails with a conflict) unless the API explicitly supports cascading clear of slots in a transaction — **implement `RESTRICT` first** for predictability.
+- **HTTP-oriented errors (when routes exist):** 404 wrong id / wrong household; 400 validation; 409 conflicts (duplicate ingredient name per rules, delete meal in use).
+
+## Indexing
+
+- Index or unique constraints as implied above: `DayPlan (householdId, date)` unique; consider index on `Meal(householdId)`, `Ingredient(householdId)`, `DayPlan(householdId)` for list/range queries.
+
+## Testing strategy (scripts)
+
+Split tests so **integration** runs less often locally:
+
+- **`tests/unit/`** — mappers, validation, pure logic, no database.
+- **`tests/integration/`** — Prisma/Postgres (or API against real DB) tests.
+
+**npm/bun scripts (to implement):**
+
+- `test:unit` — e.g. `bun test tests/unit`
+- `test:integration` — e.g. `bun test tests/integration`
+- `test:all` — both suites
+- Default **`test`** → **`test:unit`** for a fast local loop.
+
+**`scripts/check.sh`:** run **unit tests only** for local “check”; run **`test:all`** in CI before merge (or a dedicated CI job for integration). Relocate existing tests (e.g. `tests/api/`) under `tests/integration/` when wiring this up.
+
+## Out of scope (MVP)
+
+- Breakfast/snacks slots
+- `Image` / upload pipeline as a first-class table
+- User preferences / suggestion constraints (qualities are stored to support this later)
+- Qualities as EAV/JSONB (explicitly **not** chosen; columns + migrations for new flags)
+
+## Summary
+
+The MVP relational core is: **Household**, **User**, **HouseholdMembership**, **Meal** (with boolean quality columns and opaque `imageId`), **Ingredient** (with `storageType` + `perishable`), **MealHeroIngredient**, **MealCookedBy**, and **DayPlan** (nullable lunch/dinner, unique per household per date). TypeScript DTOs nest `qualities` for API consumers; persistence stays flat and relational.
