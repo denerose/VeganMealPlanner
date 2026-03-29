@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { SignJWT } from 'jose';
 import {
   assertJwtAccessConfigLoaded,
+  isJwtAccessVerifyFailure,
   JwtAccessConfigError,
   JwtAccessSecretMissingError,
   JwtAccessTokenExpiredError,
@@ -82,10 +83,18 @@ describe('jwt-access', () => {
   });
 
   test('expired token fails with expired error', async () => {
-    setJwtEnv(SECRET_A, '1');
-    const { token } = await signAccessToken(USER_ID);
-    await new Promise<void>((resolve) => setTimeout(resolve, 1100));
-    await expect(verifyAccessToken(token)).rejects.toBeInstanceOf(JwtAccessTokenExpiredError);
+    setJwtEnv(SECRET_A, '3600');
+    const key = new TextEncoder().encode(SECRET_A);
+    const now = Math.floor(Date.now() / 1000);
+    const expiredToken = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(USER_ID)
+      .setIssuedAt(now - 120)
+      .setExpirationTime(now - 60)
+      .sign(key);
+    await expect(verifyAccessToken(expiredToken)).rejects.toBeInstanceOf(
+      JwtAccessTokenExpiredError
+    );
   });
 
   test('token signed with HS512 is rejected (wrong algorithm)', async () => {
@@ -129,6 +138,34 @@ describe('jwt-access', () => {
     await expect(signAccessToken(USER_ID)).rejects.toBeInstanceOf(JwtAccessConfigError);
   });
 
+  test('JWT_EXPIRES_IN with non-numeric suffix throws JwtAccessConfigError', async () => {
+    setJwtEnv(SECRET_A, '3600abc');
+    await expect(signAccessToken(USER_ID)).rejects.toBeInstanceOf(JwtAccessConfigError);
+  });
+
+  test('JWT_EXPIRES_IN trimmed whitespace still parses', async () => {
+    setJwtEnv(SECRET_A, ' 3600 ');
+    const { token, expiresIn } = await signAccessToken(USER_ID);
+    expect(expiresIn).toBe(3600);
+    const { sub } = await verifyAccessToken(token);
+    expect(sub).toBe(USER_ID);
+  });
+
+  test('JWT_EXPIRES_IN whitespace-only throws JwtAccessConfigError', async () => {
+    setJwtEnv(SECRET_A, '   ');
+    await expect(signAccessToken(USER_ID)).rejects.toBeInstanceOf(JwtAccessConfigError);
+  });
+
+  test('signAccessToken rejects empty userId', async () => {
+    setJwtEnv(SECRET_A, '3600');
+    await expect(signAccessToken('')).rejects.toBeInstanceOf(JwtAccessTokenMalformedError);
+  });
+
+  test('signAccessToken rejects whitespace-only userId', async () => {
+    setJwtEnv(SECRET_A, '3600');
+    await expect(signAccessToken('   ')).rejects.toBeInstanceOf(JwtAccessTokenMalformedError);
+  });
+
   test('empty token is malformed', async () => {
     setJwtEnv(SECRET_A, '3600');
     await expect(verifyAccessToken('   ')).rejects.toBeInstanceOf(JwtAccessTokenMalformedError);
@@ -149,5 +186,20 @@ describe('jwt-access', () => {
     process.env.JWT_SECRET = SECRET_A;
     delete process.env.JWT_EXPIRES_IN;
     expect(() => assertJwtAccessConfigLoaded()).toThrow(JwtAccessConfigError);
+  });
+
+  test('isJwtAccessVerifyFailure is true for verify failure error classes', () => {
+    expect(isJwtAccessVerifyFailure(new JwtAccessTokenExpiredError())).toBe(true);
+    expect(isJwtAccessVerifyFailure(new JwtAccessTokenInvalidSignatureError())).toBe(true);
+    expect(isJwtAccessVerifyFailure(new JwtAccessTokenInvalidAlgorithmError())).toBe(true);
+    expect(isJwtAccessVerifyFailure(new JwtAccessTokenMalformedError())).toBe(true);
+  });
+
+  test('isJwtAccessVerifyFailure is false for other errors', () => {
+    expect(isJwtAccessVerifyFailure(new Error('other'))).toBe(false);
+    expect(isJwtAccessVerifyFailure(new JwtAccessSecretMissingError())).toBe(false);
+    expect(isJwtAccessVerifyFailure(new JwtAccessConfigError('x'))).toBe(false);
+    expect(isJwtAccessVerifyFailure(null)).toBe(false);
+    expect(isJwtAccessVerifyFailure(undefined)).toBe(false);
   });
 });

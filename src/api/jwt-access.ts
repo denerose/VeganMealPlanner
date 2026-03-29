@@ -57,6 +57,16 @@ export class JwtAccessTokenMalformedError extends Error {
   }
 }
 
+/** True when `e` is a JWT verify failure that should map to HTTP 401 `invalid_token`. */
+export function isJwtAccessVerifyFailure(e: unknown): boolean {
+  return (
+    e instanceof JwtAccessTokenExpiredError ||
+    e instanceof JwtAccessTokenInvalidSignatureError ||
+    e instanceof JwtAccessTokenInvalidAlgorithmError ||
+    e instanceof JwtAccessTokenMalformedError
+  );
+}
+
 function requireSecret(): Uint8Array {
   const raw = process.env.JWT_SECRET;
   if (!raw?.trim()) {
@@ -67,11 +77,18 @@ function requireSecret(): Uint8Array {
 
 function requireExpiresInSeconds(): number {
   const raw = process.env.JWT_EXPIRES_IN;
-  if (raw === undefined || raw === '') {
+  if (raw === undefined) {
     throw new JwtAccessConfigError('JWT_EXPIRES_IN is required (positive integer, seconds)');
   }
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    throw new JwtAccessConfigError('JWT_EXPIRES_IN is required (positive integer, seconds)');
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    throw new JwtAccessConfigError('JWT_EXPIRES_IN must be a positive integer (seconds)');
+  }
+  const n = Number(trimmed);
+  if (!Number.isSafeInteger(n) || n <= 0) {
     throw new JwtAccessConfigError('JWT_EXPIRES_IN must be a positive integer (seconds)');
   }
   return n;
@@ -95,12 +112,16 @@ export function assertJwtAccessConfigLoaded(): void {
 export async function signAccessToken(
   userId: string
 ): Promise<{ token: string; expiresIn: number }> {
+  const sub = userId.trim();
+  if (!sub) {
+    throw new JwtAccessTokenMalformedError('Access token subject (userId) must be non-empty');
+  }
   const secretKey = requireSecret();
   const expiresIn = requireExpiresInSeconds();
   const now = Math.floor(Date.now() / 1000);
   const token = await new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(userId)
+    .setSubject(sub)
     .setIssuedAt(now)
     .setExpirationTime(now + expiresIn)
     .sign(secretKey);
