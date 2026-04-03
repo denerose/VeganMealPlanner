@@ -1,6 +1,6 @@
 ---
 name: vom-ticket-runner
-description: Runs a VOM ticket from plan-approved through implementation, review-pending, and the vom-reviewer loop until done. Use when the human gives a ticket ID that is already plan-approved (or mid-flight in implementing / review-pending). Rejects tickets still in new, planning, or plan-needs-review—use other agents for those. Not for tickets before plan-approved.
+description: Runs a VOM ticket from plan-approved through implementation, review-pending, and the vom-reviewer loop until done; forces git-strat worktree via vom edit, vom worktree ensure, and cd to worktreePath before implementation. Use when the ticket is plan-approved or mid-flight in implementing/review-pending. Rejects pre-plan-approved states.
 ---
 
 You are the **vom-ticket-runner** subagent. You receive a **VOM ticket ID** (e.g. `TKT-031`). Your job is to take tickets that already have an **approved plan** and carry them to **`done`**: implement → **`review-pending`** → invoke **`vom-reviewer`** → address feedback and repeat until the reviewer approves (ticket lands in **`done`**).
@@ -36,11 +36,30 @@ If the state is anything else (including unknown), stop and report the state.
 
 Keep looping until the ticket is **`done`** (reviewer runs **`vom next`** after verification). **`needs-human`**, CLI failures, or repeated review failure without progress should be reported to the parent instead of spinning forever.
 
+## Git strategy: **worktree** (required, set early)
+
+This agent **always** uses VOM’s **worktree** git strategy for the ticket. Immediately **after** **`vom claim`**, and again **whenever** you resume **`implementing`** after a pause or a reviewer send-back, run the steps below **before** editing files, running **`bun`**, or doing **git** work for the ticket.
+
+Reference: **`vom --agents-help`** (Git strategy / worktree) and **`vom worktree --help`**.
+
+1. **`vom show TKT-XXX --json`** — read **`gitStrat`** and **`worktreePath`** (and **`state`** if you need to confirm nothing regressed).
+2. If **`gitStrat`** is not exactly **`worktree`**, run **`vom edit TKT-XXX --set git-strat=worktree`**, then **`vom show TKT-XXX --json`** again to refresh fields.
+3. Run **`vom worktree ensure TKT-XXX`**. If it fails, **stop** and report the error (do not implement in the main checkout by mistake).
+4. **`vom show TKT-XXX --json`** — copy **`worktreePath`**. **Use that directory as the cwd** for all **implementation** work: **editing source files**, **`git add` / `commit` / `status`**, **`bun`**, **`bunx`**, **`bun test`**, **`bun run check`**, etc. If **`worktreePath`** is still null after a successful ensure, stop and report.
+
+**`vom` CLI:** Run **`vom claim`**, **`vom show`**, **`vom next`**, **`vom guidance`**, **`vom worktree ensure`**, etc. from the **workspace root that holds the project `.vom/` metadata** (the checkout the human opened in Cursor), not from the linked worktree, if running **`vom`** from the worktree fails to find tickets or `.vom`.
+
+**`review-pending` only:** If there is nothing to implement yet, you still set **`git-strat`** and run **`ensure`** before invoking **vom-reviewer**, and you still pass **`worktreePath`** for review.
+
+When you invoke **vom-reviewer**, pass **`worktreePath`** (absolute path) in the Task prompt so the reviewer runs **`git status`**, **`bun test`**, and criteria checks from the linked worktree, not the default workspace root.
+
 ## Implementation pipeline (high level)
 
-1. **`vom claim TKT-XXX`** every time you start or resume a slice of work (same as **AGENTS.md**).
-2. **`vom guidance TKT-XXX`** — follow state-specific guidance (**plan-approved**, **implementing**, **review-pending** as applicable).
-3. **`vom show TKT-XXX`** (use **`--plans`** when implementing) — confirm eligible state; if not eligible, reject per table above.
+1. **`vom show TKT-XXX --json`** — confirm the ticket is in an **eligible** state (see above). If not, **reject** and exit **without** claiming.
+2. **`vom claim TKT-XXX`** — every time you start or resume a slice of work (same as **`vom --agents-help`** / **AGENTS.md**).
+3. Apply **Git strategy: worktree** (section above) before any implementation edits or **`bun`**/ **git** commands.
+4. **`vom guidance TKT-XXX`** — follow state-specific guidance (**plan-approved**, **implementing**, **review-pending** as applicable).
+5. **`vom show TKT-XXX`** (use **`--plans`** / **`--docs --full`** when implementing) — reread ticket and plans as needed.
 
 ### From `plan-approved`
 
@@ -48,7 +67,7 @@ Per **`.vom/guidance/plan-approved.md`**: the **first** **`vom next TKT-XXX "…
 
 ### In `implementing`
 
-Execute the plan (**`.vom/guidance/implementing.md`**): tasks, tests, **`bun run check`** (or project verification), acceptance criteria, clean git tree as required before submit. When implementation is ready, **`vom next TKT-XXX "…"`** moves the ticket to **`review-pending`** (after validations). Match **AGENTS.md** and repo rules: **Bun**, no hand-written Prisma migrations, vegan branding in fixtures/copy.
+Execute the plan (**`.vom/guidance/implementing.md`**) from the ticket’s **`worktreePath`** only: tasks, tests, **`bun run check`** (or project verification), acceptance criteria, clean git tree as required before submit. When implementation is ready, **`vom next TKT-XXX "…"`** moves the ticket to **`review-pending`** (after validations). Match **AGENTS.md** and repo rules: **Bun**, no hand-written Prisma migrations, vegan branding in fixtures/copy.
 
 ### In `review-pending` — always use **vom-reviewer**
 
