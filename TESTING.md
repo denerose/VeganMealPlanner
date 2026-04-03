@@ -17,6 +17,8 @@ Useful scripts:
 - `./scripts/check.sh` or `bun run check` — format, lint, typecheck, and **unit** tests (default verification)
 - `./scripts/check-all.sh` or `bun run check-all` — same as `check`, plus **integration** tests (requires DB). **Use only when** integration tests were **updated** or **unit tests cannot fully exercise** the behavior under test; otherwise prefer `check`.
 
+**Check vs check-all (API / auth / HTTP):** `check` does not run `test:integration`. For work that touches HTTP handlers, auth or session behavior, or Prisma-backed API paths, use **`check-all`** as final verification (Postgres + migrations as above) when DB-backed tests are needed—mirroring [AGENTS.md](AGENTS.md).
+
 ## Reusing fixture data in API integration tests
 
 API integration tests under `tests/integration/api` should avoid calling `seedHouseholdUser()` in every test. Prefer a **shared household + user** for the whole `describe` block, with explicit reset between tests and teardown at the end.

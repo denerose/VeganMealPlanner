@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Runs format, lint, typecheck, and unit tests only. Integration tests are not run here;
+# use ./scripts/check-all.sh (or bun run check-all) to include bun run test:integration.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
