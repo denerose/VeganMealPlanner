@@ -53,6 +53,16 @@ Same PR as the schema change is ideal so docs never lag behind main.
 - `displayName` — optional profile label for UI (e.g. cook pickers)
 - `createdAt`, `updatedAt`
 
+#### Rollout / upgrades (`User.email` NOT NULL)
+
+Auth-related migrations (folder **`20260328130000_auth_api`**) add **`email`** as **`TEXT NOT NULL`** on **`User`**. Behavior depends on whether **`User`** already had rows when that migration runs.
+
+- **Greenfield or empty `User`:** Migrations apply in order; the **`ADD COLUMN "email" TEXT NOT NULL`** step succeeds when there are no existing rows that would violate the constraint.
+- **Existing rows without `email`:** PostgreSQL rejects **`NOT NULL`** on the new column until every row has a value. Do **not** fix this by hand-editing **already-shipped** `migration.sql` under **`prisma/migrations/`** (project rule: Prisma owns those files).
+- **Safe paths (project rules):**
+  - **Dev, data loss OK:** Prefer **`bunx prisma migrate reset`** so the schema and migration history match a clean database.
+  - **Preserve data:** Use a **Prisma-owned** sequence: change **`schema.prisma`**, then create **new** migrations with **`bunx prisma migrate dev`** (for example: add **`email`** as nullable first, backfill via app/script or controlled one-off SQL against the database, then a follow-up migration to set **`NOT NULL`** and uniqueness as required). Apply generated migrations to shared/staging/production with **`bunx prisma migrate deploy`** — still **no** hand-edited files under **`prisma/migrations/`**.
+
 ### `HouseholdMembership`
 
 - `userId` (FK → `User`)
