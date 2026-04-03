@@ -32,4 +32,8 @@ The server listens on port 3000 (or `PORT`). **`GET /api/health`** returns `200`
 
 Protected routes expect **`Authorization: Bearer <JWT>`** with a `sub` claim (user id), or **`AUTH_MODE=development`** with **`X-Dev-User-Id: <uuid>`** (see `.env.example` and `contracts/openapi.yaml`).
 
+**Production / JWT:** When `AUTH_MODE` is not `development`, **`JWT_SECRET`** and **`JWT_EXPIRES_IN`** are required. Tokens use **HS256**; **`JWT_SECRET`** must be at least **32 UTF-8 bytes** of cryptographically random material (align with `.env.example`, e.g. `openssl rand -base64 48`). If the secret is present but too short, **the API refuses to start** in that mode. In **`AUTH_MODE=development`**, a short secret only produces a startup **warning** so local setups can still run.
+
+**Password hashing:** User passwords are stored with **Argon2id** using explicit cost parameters in code (not environment variables) so every environment hashes consistently: **19 MiB** memory (`memoryCost` 19456 KiB), **2** time passes, **parallelism 1**, matching the [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) minimum recommendation for deployments with less than 64 GiB RAM. See `src/api/password.ts` (`ARGON2_PASSWORD_OPTIONS`).
+
 The published HTTP contract is **`contracts/openapi.yaml`** (OpenAPI 3). Unit tests validate this spec (`tests/unit/contracts/openapi.test.ts`); run `bun run test:unit` or `./scripts/check.sh` after changing the API or the contract. Use `./scripts/check-all.sh` / `bun run check-all` only if you also need integration coverage for that change (see **Full check with integration tests** above).

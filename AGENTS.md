@@ -12,6 +12,12 @@ This project uses **Bun** as the runtime.
 - **All checks (default):** `./scripts/check.sh` (or `bun run check`) runs format check, lint, typecheck, and **unit** tests only; failures are summarized to keep context clean—use this for routine verification.
 - **Checks including integration tests:** `./scripts/check-all.sh` (or `bun run check-all`) runs the same steps plus **`bun run test:integration`** (needs Postgres with migrations applied). **Use `check-all` only when** you have **updated integration tests** or the **current implementation cannot be fully validated by unit tests alone**—otherwise prefer `check` / `bun run check` to avoid unnecessary DB dependency and runtime.
 
+### Final verification (API / auth / HTTP)
+
+- **`bun run check`** is the default routine loop; it does **not** run `test:integration`.
+- Treat **`bun run check-all`** (Postgres + migrations per [TESTING.md](TESTING.md)) as **final verification** before merge when you change HTTP handlers, auth or session behavior, or OpenAPI-backed routes in ways that need DB-backed validation; when you add or change tests under `tests/integration`; or when unit tests cannot exercise the code path you changed.
+- Purely static changes (comments, types without behavior) may stay on `check` only when that is appropriate.
+
 **API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`. **Testing conventions and integration fixtures:** [TESTING.md](TESTING.md).
 
 See [README.md](README.md) for more.

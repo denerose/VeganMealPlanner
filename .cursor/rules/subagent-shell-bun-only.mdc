@@ -16,7 +16,7 @@ alwaysApply: true
 ❌ BAD — subprocess/spawn wrappers whose goal is to bypass or answer interactive prompts
 ✅ GOOD — bun run check, bunx prisma migrate dev (when non-interactive / documented flags apply)
 
-**`bun run check-all`** (or `./scripts/check-all.sh`) includes integration tests and needs a live DB. Use it **only** when integration tests were updated or unit tests alone cannot validate the implementation; default to **`bun run check`**.
+**`bun run check-all`** (or `./scripts/check-all.sh`) includes integration tests and needs a live DB. Use it **only** when integration tests were updated or unit tests alone cannot validate the implementation—especially for **API / auth / HTTP** work that needs DB-backed validation; default to **`bun run check`**.
 ```
 
 ## Interactive tooling

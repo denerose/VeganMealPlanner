@@ -4,6 +4,11 @@ import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
 
 const databaseUrl = process.env['DATABASE_URL'];
+
+// Prisma Migrate uses a shadow database. When SHADOW_DATABASE_URL is unset, we derive one from
+// DATABASE_URL by replacing the last path segment with `prisma_migrate_shadow`. That heuristic
+// can be wrong for nonstandard URLs (Unix socket–only, missing DB path segment, unusual formats).
+// Set SHADOW_DATABASE_URL explicitly to a dedicated shadow database when the default is wrong.
 const shadowDatabaseUrl =
   process.env['SHADOW_DATABASE_URL'] ??
   (databaseUrl ? databaseUrl.replace(/\/[^/?]+(\?.*)?$/, '/prisma_migrate_shadow$1') : undefined);

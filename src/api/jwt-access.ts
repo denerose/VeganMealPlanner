@@ -57,6 +57,16 @@ export class JwtAccessTokenMalformedError extends Error {
   }
 }
 
+/** True when `e` is a JWT verify failure that should map to HTTP 401 `invalid_token`. */
+export function isJwtAccessVerifyFailure(e: unknown): boolean {
+  return (
+    e instanceof JwtAccessTokenExpiredError ||
+    e instanceof JwtAccessTokenInvalidSignatureError ||
+    e instanceof JwtAccessTokenInvalidAlgorithmError ||
+    e instanceof JwtAccessTokenMalformedError
+  );
+}
+
 function requireSecret(): Uint8Array {
   const raw = process.env.JWT_SECRET;
   if (!raw?.trim()) {
@@ -67,11 +77,18 @@ function requireSecret(): Uint8Array {
 
 function requireExpiresInSeconds(): number {
   const raw = process.env.JWT_EXPIRES_IN;
-  if (raw === undefined || raw === '') {
+  if (raw === undefined) {
     throw new JwtAccessConfigError('JWT_EXPIRES_IN is required (positive integer, seconds)');
   }
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    throw new JwtAccessConfigError('JWT_EXPIRES_IN is required (positive integer, seconds)');
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    throw new JwtAccessConfigError('JWT_EXPIRES_IN must be a positive integer (seconds)');
+  }
+  const n = Number(trimmed);
+  if (!Number.isSafeInteger(n) || n <= 0) {
     throw new JwtAccessConfigError('JWT_EXPIRES_IN must be a positive integer (seconds)');
   }
   return n;
@@ -88,6 +105,46 @@ export function assertJwtAccessConfigLoaded(): void {
   requireExpiresInSeconds();
 }
 
+/** Minimum UTF-8 byte length for `JWT_SECRET` when using HS256 (operator guidance + startup checks). */
+export const JWT_SECRET_MIN_UTF8_BYTES = 32;
+
+function utf8ByteLength(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
+/**
+ * Call only after `assertJwtAccessConfigLoaded()` so unset/empty secrets still fail as missing.
+ * In production-style mode, too-short secrets fail startup with `JwtAccessConfigError`.
+ */
+export function assertJwtSecretMeetsMinUtf8LengthOrThrow(): void {
+  const trimmed = process.env.JWT_SECRET?.trim() ?? '';
+  if (!trimmed) {
+    throw new JwtAccessSecretMissingError();
+  }
+  const bytes = utf8ByteLength(trimmed);
+  if (bytes < JWT_SECRET_MIN_UTF8_BYTES) {
+    throw new JwtAccessConfigError(
+      `JWT_SECRET must be at least ${JWT_SECRET_MIN_UTF8_BYTES} UTF-8 bytes for HS256 (see README); got ${bytes}`
+    );
+  }
+}
+
+/**
+ * Development-only hint: if `JWT_SECRET` is set but shorter than `JWT_SECRET_MIN_UTF8_BYTES`,
+ * log one warning. Does nothing when unset or empty.
+ */
+export function warnIfDevelopmentJwtSecretBelowMin(): void {
+  const trimmed = process.env.JWT_SECRET?.trim() ?? '';
+  if (!trimmed) {
+    return;
+  }
+  if (utf8ByteLength(trimmed) < JWT_SECRET_MIN_UTF8_BYTES) {
+    console.warn(
+      `[jwt-access] JWT_SECRET must be at least ${JWT_SECRET_MIN_UTF8_BYTES} UTF-8 bytes for HS256; use a cryptographically random value (see README)`
+    );
+  }
+}
+
 /**
  * Signs an HS256 access JWT with `sub`, `iat`, and `exp`.
  * Requires `JWT_SECRET` and `JWT_EXPIRES_IN` (seconds). Missing `JWT_SECRET` throws (never signs with an empty key).
@@ -95,12 +152,16 @@ export function assertJwtAccessConfigLoaded(): void {
 export async function signAccessToken(
   userId: string
 ): Promise<{ token: string; expiresIn: number }> {
+  const sub = userId.trim();
+  if (!sub) {
+    throw new JwtAccessTokenMalformedError('Access token subject (userId) must be non-empty');
+  }
   const secretKey = requireSecret();
   const expiresIn = requireExpiresInSeconds();
   const now = Math.floor(Date.now() / 1000);
   const token = await new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(userId)
+    .setSubject(sub)
     .setIssuedAt(now)
     .setExpirationTime(now + expiresIn)
     .sign(secretKey);
