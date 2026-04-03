@@ -105,6 +105,46 @@ export function assertJwtAccessConfigLoaded(): void {
   requireExpiresInSeconds();
 }
 
+/** Minimum UTF-8 byte length for `JWT_SECRET` when using HS256 (operator guidance + startup checks). */
+export const JWT_SECRET_MIN_UTF8_BYTES = 32;
+
+function utf8ByteLength(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
+/**
+ * Call only after `assertJwtAccessConfigLoaded()` so unset/empty secrets still fail as missing.
+ * In production-style mode, too-short secrets fail startup with `JwtAccessConfigError`.
+ */
+export function assertJwtSecretMeetsMinUtf8LengthOrThrow(): void {
+  const trimmed = process.env.JWT_SECRET?.trim() ?? '';
+  if (!trimmed) {
+    throw new JwtAccessSecretMissingError();
+  }
+  const bytes = utf8ByteLength(trimmed);
+  if (bytes < JWT_SECRET_MIN_UTF8_BYTES) {
+    throw new JwtAccessConfigError(
+      `JWT_SECRET must be at least ${JWT_SECRET_MIN_UTF8_BYTES} UTF-8 bytes for HS256 (see README); got ${bytes}`
+    );
+  }
+}
+
+/**
+ * Development-only hint: if `JWT_SECRET` is set but shorter than `JWT_SECRET_MIN_UTF8_BYTES`,
+ * log one warning. Does nothing when unset or empty.
+ */
+export function warnIfDevelopmentJwtSecretBelowMin(): void {
+  const trimmed = process.env.JWT_SECRET?.trim() ?? '';
+  if (!trimmed) {
+    return;
+  }
+  if (utf8ByteLength(trimmed) < JWT_SECRET_MIN_UTF8_BYTES) {
+    console.warn(
+      `[jwt-access] JWT_SECRET must be at least ${JWT_SECRET_MIN_UTF8_BYTES} UTF-8 bytes for HS256; use a cryptographically random value (see README)`
+    );
+  }
+}
+
 /**
  * Signs an HS256 access JWT with `sub`, `iat`, and `exp`.
  * Requires `JWT_SECRET` and `JWT_EXPIRES_IN` (seconds). Missing `JWT_SECRET` throws (never signs with an empty key).

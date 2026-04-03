@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { SignJWT } from 'jose';
 import {
   assertJwtAccessConfigLoaded,
+  assertJwtSecretMeetsMinUtf8LengthOrThrow,
   isJwtAccessVerifyFailure,
   JwtAccessConfigError,
+  JWT_SECRET_MIN_UTF8_BYTES,
   JwtAccessSecretMissingError,
   JwtAccessTokenExpiredError,
   JwtAccessTokenInvalidAlgorithmError,
@@ -11,6 +13,7 @@ import {
   JwtAccessTokenMalformedError,
   signAccessToken,
   verifyAccessToken,
+  warnIfDevelopmentJwtSecretBelowMin,
 } from '../../../src/api/jwt-access';
 
 const USER_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -201,5 +204,78 @@ describe('jwt-access', () => {
     expect(isJwtAccessVerifyFailure(new JwtAccessConfigError('x'))).toBe(false);
     expect(isJwtAccessVerifyFailure(null)).toBe(false);
     expect(isJwtAccessVerifyFailure(undefined)).toBe(false);
+  });
+
+  describe('JWT_SECRET minimum UTF-8 length', () => {
+    test('assertJwtSecretMeetsMinUtf8LengthOrThrow passes at exactly min bytes', () => {
+      setJwtEnv('a'.repeat(JWT_SECRET_MIN_UTF8_BYTES), '3600');
+      expect(() => assertJwtSecretMeetsMinUtf8LengthOrThrow()).not.toThrow();
+    });
+
+    test('assertJwtSecretMeetsMinUtf8LengthOrThrow throws JwtAccessConfigError when one byte short', () => {
+      setJwtEnv('a'.repeat(JWT_SECRET_MIN_UTF8_BYTES - 1), '3600');
+      let err: unknown;
+      try {
+        assertJwtSecretMeetsMinUtf8LengthOrThrow();
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(JwtAccessConfigError);
+      expect((err as Error).message).toMatch(/32/);
+    });
+
+    test('assertJwtSecretMeetsMinUtf8LengthOrThrow throws JwtAccessSecretMissingError when unset', () => {
+      delete process.env.JWT_SECRET;
+      process.env.JWT_EXPIRES_IN = '3600';
+      expect(() => assertJwtSecretMeetsMinUtf8LengthOrThrow()).toThrow(JwtAccessSecretMissingError);
+    });
+
+    test('warnIfDevelopmentJwtSecretBelowMin logs once when secret is too short', () => {
+      const originalWarn = console.warn;
+      const warns: string[] = [];
+      console.warn = (...args: unknown[]) => {
+        warns.push(args.map(String).join(' '));
+      };
+      try {
+        setJwtEnv('a'.repeat(JWT_SECRET_MIN_UTF8_BYTES - 1), '3600');
+        warnIfDevelopmentJwtSecretBelowMin();
+        expect(warns).toHaveLength(1);
+        expect(warns[0]).toMatch(/JWT_SECRET/);
+        expect(warns[0]).toMatch(/32/);
+      } finally {
+        console.warn = originalWarn;
+      }
+    });
+
+    test('warnIfDevelopmentJwtSecretBelowMin does not warn when secret meets min length', () => {
+      const originalWarn = console.warn;
+      const warns: string[] = [];
+      console.warn = (...args: unknown[]) => {
+        warns.push(args.map(String).join(' '));
+      };
+      try {
+        setJwtEnv('a'.repeat(JWT_SECRET_MIN_UTF8_BYTES), '3600');
+        warnIfDevelopmentJwtSecretBelowMin();
+        expect(warns).toHaveLength(0);
+      } finally {
+        console.warn = originalWarn;
+      }
+    });
+
+    test('warnIfDevelopmentJwtSecretBelowMin does not warn when JWT_SECRET unset', () => {
+      const originalWarn = console.warn;
+      const warns: string[] = [];
+      console.warn = (...args: unknown[]) => {
+        warns.push(args.map(String).join(' '));
+      };
+      try {
+        delete process.env.JWT_SECRET;
+        process.env.JWT_EXPIRES_IN = '3600';
+        warnIfDevelopmentJwtSecretBelowMin();
+        expect(warns).toHaveLength(0);
+      } finally {
+        console.warn = originalWarn;
+      }
+    });
   });
 });

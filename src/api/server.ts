@@ -6,7 +6,11 @@ import { jsonError } from './errors';
 import { ApiProblem } from './api-problem';
 import { getHouseholdForUser } from './services/tenancy';
 import { apiAllowedMethodsForPathname, dispatchApi } from './router';
-import { assertJwtAccessConfigLoaded } from './jwt-access';
+import {
+  assertJwtAccessConfigLoaded,
+  assertJwtSecretMeetsMinUtf8LengthOrThrow,
+  warnIfDevelopmentJwtSecretBelowMin,
+} from './jwt-access';
 import { handlePostLogin, handlePostLogout, handlePostRegister } from './handlers/auth';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -83,6 +87,9 @@ if (import.meta.main) {
   const authMode = process.env.AUTH_MODE ?? 'production';
   if (authMode !== 'development') {
     assertJwtAccessConfigLoaded();
+    assertJwtSecretMeetsMinUtf8LengthOrThrow();
+  } else {
+    warnIfDevelopmentJwtSecretBelowMin();
   }
   Bun.serve({
     port: PORT,
