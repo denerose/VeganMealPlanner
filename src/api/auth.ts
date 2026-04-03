@@ -1,23 +1,8 @@
 import { jsonError } from './errors';
-import {
-  JwtAccessTokenExpiredError,
-  JwtAccessTokenInvalidAlgorithmError,
-  JwtAccessTokenInvalidSignatureError,
-  JwtAccessTokenMalformedError,
-  verifyAccessToken,
-} from './jwt-access';
+import { isJwtAccessVerifyFailure, verifyAccessToken } from './jwt-access';
 import { isUuid } from './uuid';
 
 export { isUuid } from './uuid';
-
-function isJwtAccessVerifyFailure(e: unknown): boolean {
-  return (
-    e instanceof JwtAccessTokenExpiredError ||
-    e instanceof JwtAccessTokenInvalidSignatureError ||
-    e instanceof JwtAccessTokenInvalidAlgorithmError ||
-    e instanceof JwtAccessTokenMalformedError
-  );
-}
 
 /** Resolve `User.id` from request headers, or return a JSON error `Response`. */
 export async function resolveAuthUserId(req: Request): Promise<string | Response> {
