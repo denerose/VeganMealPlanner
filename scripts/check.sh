@@ -18,7 +18,6 @@ for i in "${!CHECK_CMDS[@]}"; do
     if [ "$name" = "Tests" ]; then
       echo "$out" | grep -E '\(fail\)' || true
       echo "$out" | tail -15
-      bun run db:seed > /dev/null 2>&1
     else
       echo "$out"
     fi
