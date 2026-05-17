@@ -1,9 +1,5 @@
-.vom/
-!.vom/guidance/
-!.vom/guidance/*
 node_modules/
 .env
 .env.*
 !.env.example
 /src/generated/prisma
-.cursor/settings.json
