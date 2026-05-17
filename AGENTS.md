@@ -18,41 +18,69 @@ This project uses **Bun** as the runtime.
 - Treat **`bun run check-all`** (Postgres + migrations per [TESTING.md](TESTING.md)) as **final verification** before merge when you change HTTP handlers, auth or session behavior, or OpenAPI-backed routes in ways that need DB-backed validation; when you add or change tests under `tests/integration`; or when unit tests cannot exercise the code path you changed.
 - Purely static changes (comments, types without behavior) may stay on `check` only when that is appropriate.
 
-**API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo’s `docker-compose.yml`. **Testing conventions and integration fixtures:** [TESTING.md](TESTING.md).
+**API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo's `docker-compose.yml`. **Testing conventions and integration fixtures:** [TESTING.md](TESTING.md).
 
 See [README.md](README.md) for more.
 
 ## Conventions
 
-- **Cursor rules** live in `.cursor/rules/` (e.g. use Bun instead of Node/npm/pnpm).
-- **Cursor skills** live in `.cursor/skills/`. For ticketing we use:
-  - **vom** — continue work on a VOM ticket (claim → guidance → show → work → next)
-  - **vom-new** — create a new VOM ticket
-  - **vom-self-review** — review recent work and create/update tickets for friction
-  - **vom-tidy** — move done tickets to `tickets/done` (or run `./scripts/vom-tidy.sh` from repo root)
-  - **vom-open-plan** — open the implementation plan for a VOM ticket (e.g. "open plan for TKT-017", or "open the plan" when a ticket is already in context)
-  - **prisma-delegate-migrate** — subagents/Task workers edit `schema.prisma` only and hand off `bunx prisma migrate dev` to the host; see `.cursor/skills/prisma-delegate-migrate/SKILL.md` and rule `subagent-prisma-host-handoff.mdc`
-  - **subagent-driven-development** — execute multi-task plans with an implementer subagent plus spec and code-quality reviews per task; prompts live in `.cursor/skills/superpowers/subagent-driven-development/` (see `SKILL.md`)
-  - **superpowers-subagents-final-check** — after subagent code/spec reviews, reconcile feedback with the repo and create VOM tickets for remaining good recommendations; see `.cursor/skills/superpowers/superpowers-subagents-final-check/SKILL.md`
-- **Vegan branding in ephemera:** Keep examples, seed data, test fixtures, OpenAPI samples, doc snippets, and any other non-production copy aligned with the app’s purpose: **plant-based / vegan food only**. Do not use animal products, non-vegan dishes, or messaging that conflicts with vegan principles in sample names, ingredient lists, or placeholder text.
+### Use Bun instead of Node.js
 
-Prefer Bun over Node, npm, pnpm, etc., per project rules.
+Default to using Bun instead of Node.js, npm, pnpm, or vite.
 
-- **Docs in test/source trees:** Do not add `README.md` under `tests/**` or `src/**` unless the user explicitly asked for that path. Put testing notes and API test coverage maps in **[TESTING.md](TESTING.md)**. See Cursor rule `documentation-no-ad-hoc-readmes-tests-src.mdc`.
+- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
+- Use `bun test` instead of `jest` or `vitest`
+- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
+- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
+- Use `bunx <package> <command>` instead of `npx <package> <command>`
+- Bun automatically loads `.env`, so don't use dotenv.
+- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
+- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
+- `Bun.redis` for Redis. Don't use `ioredis`.
+- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
+- `WebSocket` is built-in. Don't use `ws`.
+- Prefer `Bun.file` over `node:fs`'s `readFile`/`writeFile`.
+- Bun.$`ls` instead of execa.
 
-## Workflow
+### Keep OpenAPI contract in sync
 
-For **ticket work** (VOM):
+When you change HTTP routes, methods, status codes, or JSON response bodies under `src/api/`, update `contracts/openapi.yaml` in the **same change set** so the published contract matches the implementation.
 
-1. **Claim first:** `vom claim TKT-XXX`
-2. **Follow the claim output:** run the suggested `vom guidance` and `vom show TKT-XXX --plans`
-3. **Do the work** from the plan
-4. **Advance when done:** `vom next TKT-XXX "message"`
+Before finishing, run `bun test tests/unit/contracts/openapi.test.ts`, or `bun run test:unit`, or `./scripts/check.sh` so OpenAPI validation still passes. Use `./scripts/check-all.sh` / `bun run check-all` **only** if you changed integration tests or need HTTP-level coverage that unit tests do not provide.
 
-Full agent reference: `vom --agents-help`.
+### Prisma migrations
 
-The VOM-related skills (**vom**, **vom-new**, **vom-self-review**, **vom-open-plan**) give step-by-step instructions when working on or creating tickets — use them when continuing a ticket or creating a new one.
+Do **not** create, edit, or rewrite anything under `prisma/migrations/` by hand—including `migration.sql`, new migration folders, or renaming migration directories to "fix" history. Let Prisma own generated migration artifacts.
 
-When a ticket is in **plan-needs-review**, open its implementation plan (use the **vom-open-plan** skill so the plan is in context for review).
+**Do instead:**
 
-When a ticket is in **review-pending**, the review-pending guidance and the Cursor rule `vom-review-pending-use-vom-reviewer` prompt use of the **vom-reviewer** subagent for implementation review.
+- Change `prisma/schema.prisma` (and related Prisma config only as needed).
+- Run **Prisma commands** so migrations and client stay consistent, for example:
+  - `bunx prisma migrate dev` — create/apply migrations in development
+  - `bunx prisma migrate diff` / `bunx prisma db push` — only when appropriate for the task and environment (prefer migrate dev for versioned migrations)
+
+Use **Bun** (`bunx prisma …`) per project conventions, not `npx`.
+
+```text
+❌ BAD — paste or edit SQL in prisma/migrations/.../migration.sql
+✅ GOOD — update schema.prisma, then bunx prisma migrate dev (or the CLI flow the user asked for)
+```
+
+If a migration is wrong, fix it by adjusting the schema and using Prisma's workflow (e.g. reset in dev, or a new migration from the corrected schema)—never patch migration files manually.
+
+### Documentation placement (tests and source trees)
+
+- **Do not** create `README.md` or other new ad-hoc doc files under `tests/**` or `src/**` unless the **human explicitly requested that exact path** (name and directory).
+- **Testing** conventions, API integration coverage maps, fixture notes, and "which test file covers which endpoint" tables belong in **[TESTING.md](TESTING.md)** at the repo root (new section or subsection), not in a nested README.
+- **Agent/workflow** guidance belongs in **[AGENTS.md](AGENTS.md)**.
+- **User-facing or architectural docs** → existing **[README.md](README.md)** or **`docs/`** patterns.
+
+```text
+❌ tests/integration/api/README.md (unless user asked for that file)
+❌ src/api/README.md (unless user asked for that file)
+✅ TESTING.md — "HTTP API integration tests — coverage map"
+```
+
+### Vegan branding in ephemera
+
+Keep examples, seed data, test fixtures, OpenAPI samples, doc snippets, and any other non-production copy aligned with the app's purpose: **plant-based / vegan food only**. Do not use animal products, non-vegan dishes, or messaging that conflicts with vegan principles in sample names, ingredient lists, or placeholder text.
