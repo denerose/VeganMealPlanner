@@ -1,6 +1,7 @@
 import { client } from '../client';
 import { required } from '../prompt';
 import { formatJson, formatTable, formatDate } from '../format';
+import { usageError } from '../errors';
 import type { ParsedFlags } from '../types';
 import type { MealResponseDto, MealCreateDto, MealUpdateDto } from '../../domain/dtos/meal';
 
@@ -49,18 +50,35 @@ Flags:
   }
 }
 
+const API_MAX_LIMIT = 100;
+
 async function listMeals(flags: Record<string, string>, json: boolean): Promise<void> {
+  const userLimit = flags['--limit'] ? Number(flags['--limit']) : 50;
+  const userOffset = flags['--offset'] ? Number(flags['--offset']) : 0;
+
+  if (json) {
+    const fetchLimit = userLimit < API_MAX_LIMIT ? userLimit + 1 : userLimit;
+    const params = new URLSearchParams({ limit: String(fetchLimit), offset: String(userOffset) });
+    const meals = await client.get<MealResponseDto[]>(`/api/meals?${params}`);
+
+    const hasMore = meals.length > userLimit;
+    const data = hasMore ? meals.slice(0, userLimit) : meals;
+
+    console.log(
+      formatJson({
+        data,
+        pagination: { limit: userLimit, offset: userOffset, hasMore },
+      })
+    );
+    return;
+  }
+
   const params = new URLSearchParams();
   if (flags['--limit']) params.set('limit', flags['--limit']);
   if (flags['--offset']) params.set('offset', flags['--offset']);
 
   const qs = params.toString();
   const meals = await client.get<MealResponseDto[]>(`/api/meals${qs ? `?${qs}` : ''}`);
-
-  if (json) {
-    console.log(formatJson(meals));
-    return;
-  }
 
   if (meals.length === 0) {
     console.log('No meals found.');
@@ -71,7 +89,7 @@ async function listMeals(flags: Record<string, string>, json: boolean): Promise<
     formatTable(
       ['ID', 'Name', 'Leftovers', 'Description', 'Updated'],
       meals.map((m) => [
-        m.id.slice(0, 8),
+        m.id,
         m.name,
         m.qualities.makesLeftovers ? 'Yes' : 'No',
         m.description
@@ -87,7 +105,7 @@ async function listMeals(flags: Record<string, string>, json: boolean): Promise<
 
 async function getMeal(id: string | undefined, json: boolean): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: meal ID');
+    throw usageError('Missing required argument: meal ID');
   }
   const meal = await client.get<MealResponseDto>(`/api/meals/${id}`);
 
@@ -136,7 +154,7 @@ async function updateMeal(
   json: boolean
 ): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: meal ID');
+    throw usageError('Missing required argument: meal ID');
   }
 
   const body: MealUpdateDto = {};
@@ -145,7 +163,7 @@ async function updateMeal(
   if ('--recipe-url' in flags) body.recipeUrl = flags['--recipe-url'] || null;
 
   if (Object.keys(body).length === 0) {
-    throw new Error('No fields to update. Use --name, --description, or --recipe-url.');
+    throw usageError('No fields to update. Use --name, --description, or --recipe-url.');
   }
 
   const meal = await client.patch<MealResponseDto>(`/api/meals/${id}`, body);
@@ -159,7 +177,7 @@ async function updateMeal(
 
 async function deleteMeal(id: string | undefined, json: boolean): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: meal ID');
+    throw usageError('Missing required argument: meal ID');
   }
   await client.delete(`/api/meals/${id}`);
 

@@ -5,6 +5,7 @@ import { handleMeals } from './commands/meals';
 import { handleDayPlans } from './commands/day-plans';
 import { handleHousehold } from './commands/household';
 import { ApiClientError, client } from './client';
+import { CliError, apiErrorFromClient, usageError } from './errors';
 import type { ParsedFlags } from './types';
 
 const HELP = `Usage: vmp <command> [subcommand] [flags]
@@ -19,7 +20,7 @@ Commands:
 
 Global flags:
   --api-url <url>   API base URL (default: http://localhost:3000 or VMP_API_URL)
-  --json            Output raw JSON
+  --json            Output raw JSON (structured errors on stdout)
   --help            Show this help message
 
 Environment variables:
@@ -97,6 +98,33 @@ function parseArgs(argv: string[]): ParsedArgs {
   };
 }
 
+/**
+ * Handle an error consistently:
+ * - `--json` mode → JSON error envelope on stdout, differentiated exit code
+ * - human mode → "Error: <msg>" on stderr, exit code 1
+ */
+function handleError(e: unknown, json: boolean): never {
+  let cliError: CliError;
+
+  if (e instanceof CliError) {
+    cliError = e;
+  } else if (e instanceof ApiClientError) {
+    cliError = apiErrorFromClient(e);
+  } else if (e instanceof Error) {
+    cliError = new CliError(1, 'unknown_error', e.message);
+  } else {
+    throw e; // rethrow unexpected non-Error values
+  }
+
+  if (json) {
+    console.log(JSON.stringify(cliError.toJSON(), null, 2));
+    process.exit(cliError.exitCode);
+  } else {
+    console.error(`Error: ${cliError.message}`);
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const parsed = parseArgs(Bun.argv);
 
@@ -140,20 +168,10 @@ async function main(): Promise<void> {
         await handleHealth(sub);
         break;
       default:
-        console.error(`Unknown command: ${parsed.command}`);
-        console.log(HELP);
-        process.exit(1);
+        throw usageError(`Unknown command: ${parsed.command}`);
     }
   } catch (e) {
-    if (e instanceof ApiClientError) {
-      console.error(`Error: ${e.message}`);
-      process.exit(1);
-    }
-    if (e instanceof Error) {
-      console.error(`Error: ${e.message}`);
-      process.exit(1);
-    }
-    throw e;
+    handleError(e, parsed.json);
   }
 }
 

@@ -1,6 +1,7 @@
 import { client } from '../client';
 import { required } from '../prompt';
 import { formatJson, formatTable, formatDate } from '../format';
+import { CliError, usageError } from '../errors';
 import type { ParsedFlags } from '../types';
 import { readFile } from 'node:fs/promises';
 import type { DayPlanResponseDto } from '../../domain/dtos/day-plan';
@@ -37,7 +38,7 @@ Commands:
   create            Create a day plan
   update <id>       Update a day plan
   delete <id>       Delete a day plan
-  bulk              Bulk upsert day plans from a JSON file
+  bulk              Bulk upsert day plans from JSON
 
 Flags:
   --from <YYYY-MM-DD>       Start date (list)
@@ -46,6 +47,7 @@ Flags:
   --lunch-meal-id <id>      Lunch meal ID
   --dinner-meal-id <id>     Dinner meal ID
   --file <path>             JSON file path (bulk)
+  --data <json>             Inline JSON string (bulk, mutually exclusive with --file)
   --json                    Raw JSON output`);
   }
 }
@@ -58,7 +60,9 @@ async function listDayPlans(flags: Record<string, string>, json: boolean): Promi
   const plans = await client.get<DayPlanResponseDto[]>(`/api/day-plans?${params}`);
 
   if (json) {
-    console.log(formatJson(plans));
+    // Day-plans list doesn't support limit/offset in the API (date-range only).
+    // Wrap in the standard envelope without pagination metadata.
+    console.log(formatJson({ data: plans }));
     return;
   }
 
@@ -71,7 +75,7 @@ async function listDayPlans(flags: Record<string, string>, json: boolean): Promi
     formatTable(
       ['ID', 'Date', 'Lunch', 'Dinner', 'Updated'],
       plans.map((p) => [
-        p.id.slice(0, 8),
+        p.id,
         p.date,
         p.lunchMealId ?? '—',
         p.dinnerMealId ?? '—',
@@ -83,7 +87,7 @@ async function listDayPlans(flags: Record<string, string>, json: boolean): Promi
 
 async function getDayPlan(id: string | undefined, json: boolean): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: day plan ID');
+    throw usageError('Missing required argument: day plan ID');
   }
   const plan = await client.get<DayPlanResponseDto>(`/api/day-plans/${id}`);
 
@@ -131,7 +135,7 @@ async function updateDayPlan(
   json: boolean
 ): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: day plan ID');
+    throw usageError('Missing required argument: day plan ID');
   }
 
   const body: Record<string, unknown> = {};
@@ -139,7 +143,7 @@ async function updateDayPlan(
   if ('--dinner-meal-id' in flags) body.dinnerMealId = flags['--dinner-meal-id'] || null;
 
   if (Object.keys(body).length === 0) {
-    throw new Error('No fields to update. Use --lunch-meal-id or --dinner-meal-id.');
+    throw usageError('No fields to update. Use --lunch-meal-id or --dinner-meal-id.');
   }
 
   const plan = await client.patch<DayPlanResponseDto>(`/api/day-plans/${id}`, body);
@@ -153,7 +157,7 @@ async function updateDayPlan(
 
 async function deleteDayPlan(id: string | undefined, json: boolean): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: day plan ID');
+    throw usageError('Missing required argument: day plan ID');
   }
   await client.delete(`/api/day-plans/${id}`);
 
@@ -165,12 +169,34 @@ async function deleteDayPlan(id: string | undefined, json: boolean): Promise<voi
 }
 
 async function bulkDayPlans(flags: Record<string, string>, json: boolean): Promise<void> {
-  const filePath = await required('JSON file path', 'file', flags['--file']);
-  const raw = await readFile(filePath, 'utf-8');
-  const data = JSON.parse(raw);
+  const hasFile = '--file' in flags;
+  const hasData = '--data' in flags;
+
+  if (hasFile && hasData) {
+    throw usageError('Cannot use both --file and --data. Choose one.');
+  }
+
+  let data: unknown;
+
+  if (hasData) {
+    const raw = flags['--data']!;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new CliError(2, 'invalid_json', `Failed to parse --data as JSON: ${raw}`);
+    }
+  } else {
+    const filePath = await required('JSON file path', 'file', flags['--file']);
+    const raw = await readFile(filePath, 'utf-8');
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw new CliError(2, 'invalid_json', `Failed to parse JSON file: ${filePath}`);
+    }
+  }
 
   if (!Array.isArray(data)) {
-    throw new Error('Bulk file must contain a JSON array of day plan objects.');
+    throw usageError('Bulk input must contain a JSON array of day plan objects.');
   }
 
   const plans = await client.post<DayPlanResponseDto[]>('/api/day-plans/bulk', data);

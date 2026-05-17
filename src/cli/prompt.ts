@@ -1,15 +1,29 @@
+import { CliError } from './errors';
+
 /** True when stdin is connected to a terminal (interactive session). */
 export function isInteractive(): boolean {
   return Boolean(process.stdin?.isTTY);
 }
 
 /**
+ * Thrown when a required flag is missing and stdin is not a TTY.
+ * Carries the flag name so the JSON error envelope can include it.
+ */
+export class MissingFlagError extends CliError {
+  constructor(public readonly flag: string) {
+    super(2, 'missing_flag', `Missing required flag: --${flag}. Provide it or run interactively.`, {
+      flag,
+    });
+  }
+}
+
+/**
  * Prompt the user for a text value.
- * When stdin is not a TTY, throws with a clear error naming the missing flag.
+ * When stdin is not a TTY, throws a MissingFlagError naming the missing flag.
  */
 export async function prompt(label: string, flagName: string): Promise<string> {
   if (!isInteractive()) {
-    throw new Error(`Missing required flag: --${flagName}. Provide it or run interactively.`);
+    throw new MissingFlagError(flagName);
   }
   process.stdout.write(`${label}: `);
   const line = await readLine();
@@ -22,7 +36,7 @@ export async function prompt(label: string, flagName: string): Promise<string> {
  */
 export async function promptHidden(label: string, flagName: string): Promise<string> {
   if (!isInteractive()) {
-    throw new Error(`Missing required flag: --${flagName}. Provide it or run interactively.`);
+    throw new MissingFlagError(flagName);
   }
 
   const { stdin } = process;
@@ -37,7 +51,7 @@ export async function promptHidden(label: string, flagName: string): Promise<str
 
 /**
  * Return a value: use `provided` if non-empty, otherwise prompt interactively.
- * Throws when the value is missing and stdin is not a TTY.
+ * Throws a MissingFlagError when the value is missing and stdin is not a TTY.
  */
 export async function required(
   label: string,

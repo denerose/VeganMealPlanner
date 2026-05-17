@@ -1,6 +1,7 @@
 import { client } from '../client';
 import { required } from '../prompt';
 import { formatJson, formatTable, formatRecord, formatDateTime } from '../format';
+import { usageError } from '../errors';
 import type { ParsedFlags } from '../types';
 import type { HouseholdSummaryDto, HouseholdMemberDto } from '../../domain/dtos/user';
 
@@ -59,7 +60,7 @@ async function showHousehold(json: boolean): Promise<void> {
 async function updateHousehold(flags: Record<string, string>, json: boolean): Promise<void> {
   const name = flags['--name'];
   if (!name) {
-    throw new Error('Missing required flag: --name');
+    throw usageError('Missing required flag: --name');
   }
 
   const household = await client.patch<HouseholdSummaryDto>('/api/household', {
@@ -89,7 +90,7 @@ async function listMembers(json: boolean): Promise<void> {
   console.log(
     formatTable(
       ['User ID', 'Display Name', 'Role'],
-      members.map((m) => [m.userId.slice(0, 8), m.displayName ?? '(unnamed)', m.role])
+      members.map((m) => [m.userId, m.displayName ?? '(unnamed)', m.role])
     )
   );
 }

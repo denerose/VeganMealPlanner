@@ -1,6 +1,7 @@
 import { client } from '../client';
 import { required } from '../prompt';
 import { formatJson, formatTable, formatDate } from '../format';
+import { usageError } from '../errors';
 import type { ParsedFlags } from '../types';
 import type {
   IngredientResponseDto,
@@ -48,7 +49,30 @@ Flags:
   }
 }
 
+const API_MAX_LIMIT = 100;
+
 async function listIngredients(flags: Record<string, string>, json: boolean): Promise<void> {
+  const userLimit = flags['--limit'] ? Number(flags['--limit']) : 50;
+  const userOffset = flags['--offset'] ? Number(flags['--offset']) : 0;
+
+  if (json) {
+    // Over-fetch by 1 to detect whether there are more results.
+    const fetchLimit = userLimit < API_MAX_LIMIT ? userLimit + 1 : userLimit;
+    const params = new URLSearchParams({ limit: String(fetchLimit), offset: String(userOffset) });
+    const ingredients = await client.get<IngredientResponseDto[]>(`/api/ingredients?${params}`);
+
+    const hasMore = ingredients.length > userLimit;
+    const data = hasMore ? ingredients.slice(0, userLimit) : ingredients;
+
+    console.log(
+      formatJson({
+        data,
+        pagination: { limit: userLimit, offset: userOffset, hasMore },
+      })
+    );
+    return;
+  }
+
   const params = new URLSearchParams();
   if (flags['--limit']) params.set('limit', flags['--limit']);
   if (flags['--offset']) params.set('offset', flags['--offset']);
@@ -57,11 +81,6 @@ async function listIngredients(flags: Record<string, string>, json: boolean): Pr
   const ingredients = await client.get<IngredientResponseDto[]>(
     `/api/ingredients${qs ? `?${qs}` : ''}`
   );
-
-  if (json) {
-    console.log(formatJson(ingredients));
-    return;
-  }
 
   if (ingredients.length === 0) {
     console.log('No ingredients found.');
@@ -72,7 +91,7 @@ async function listIngredients(flags: Record<string, string>, json: boolean): Pr
     formatTable(
       ['ID', 'Name', 'Storage', 'Perishable', 'Updated'],
       ingredients.map((i) => [
-        i.id.slice(0, 8),
+        i.id,
         i.name,
         i.storageType,
         i.perishable ? 'Yes' : 'No',
@@ -84,7 +103,7 @@ async function listIngredients(flags: Record<string, string>, json: boolean): Pr
 
 async function getIngredient(id: string | undefined, json: boolean): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: ingredient ID');
+    throw usageError('Missing required argument: ingredient ID');
   }
   const ingredient = await client.get<IngredientResponseDto>(`/api/ingredients/${id}`);
 
@@ -118,7 +137,7 @@ async function createIngredient(flags: Record<string, string>, json: boolean): P
 
   const validTypes = ['PANTRY', 'REFRIGERATED', 'FROZEN', 'FRESH'];
   if (!validTypes.includes(storageType.toUpperCase())) {
-    throw new Error(
+    throw usageError(
       `Invalid storage type: ${storageType}. Must be one of: ${validTypes.join(', ')}`
     );
   }
@@ -144,7 +163,7 @@ async function updateIngredient(
   json: boolean
 ): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: ingredient ID');
+    throw usageError('Missing required argument: ingredient ID');
   }
 
   const body: IngredientUpdateDto = {};
@@ -153,7 +172,7 @@ async function updateIngredient(
     const validTypes = ['PANTRY', 'REFRIGERATED', 'FROZEN', 'FRESH'];
     const st = flags['--storage-type'].toUpperCase();
     if (!validTypes.includes(st)) {
-      throw new Error(`Invalid storage type: ${st}. Must be one of: ${validTypes.join(', ')}`);
+      throw usageError(`Invalid storage type: ${st}. Must be one of: ${validTypes.join(', ')}`);
     }
     body.storageType = st as IngredientCreateDto['storageType'];
   }
@@ -162,7 +181,7 @@ async function updateIngredient(
   }
 
   if (Object.keys(body).length === 0) {
-    throw new Error('No fields to update. Use --name, --storage-type, or --perishable.');
+    throw usageError('No fields to update. Use --name, --storage-type, or --perishable.');
   }
 
   const ingredient = await client.patch<IngredientResponseDto>(`/api/ingredients/${id}`, body);
@@ -176,7 +195,7 @@ async function updateIngredient(
 
 async function deleteIngredient(id: string | undefined, json: boolean): Promise<void> {
   if (!id) {
-    throw new Error('Missing required argument: ingredient ID');
+    throw usageError('Missing required argument: ingredient ID');
   }
   await client.delete(`/api/ingredients/${id}`);
 

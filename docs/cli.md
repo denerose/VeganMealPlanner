@@ -355,12 +355,19 @@ vmp day-plans delete <id>
 #### `vmp day-plans bulk`
 
 ```bash
+# From a file:
 vmp day-plans bulk --file week-plan.json
+
+# From inline JSON (no temp file needed):
+vmp day-plans bulk --data '[{"date":"2026-05-17","lunchMealId":"uuid"}]'
 ```
 
-| Flag            | Description                                                            |
-| --------------- | ---------------------------------------------------------------------- |
-| `--file <path>` | Path to a JSON file containing an array of day plan objects (required) |
+| Flag            | Description                                                 |
+| --------------- | ----------------------------------------------------------- |
+| `--file <path>` | Path to a JSON file containing an array of day plan objects |
+| `--data <json>` | Inline JSON string (mutually exclusive with `--file`)       |
+
+One of `--file` or `--data` is required.
 
 The JSON file should contain an array matching the API's `DayPlanCreate` schema:
 
@@ -441,12 +448,71 @@ Error: Missing required flag: --password. Provide it or run interactively.
 
 ## Output formats
 
-The default output is a human-readable aligned table or key-value listing. Add `--json` to any command for raw JSON output suitable for scripting:
+The default output is a human-readable aligned table or key-value listing. Add `--json` to any command for structured JSON output suitable for scripting and AI agents:
 
 ```bash
 vmp ingredients list --json
 vmp auth whoami --json
 ```
+
+### Machine-readable output (`--json`)
+
+When `--json` is set, **all output goes to stdout as JSON** — both successes and errors. This makes the CLI fully parseable by scripts and AI agents:
+
+- **Success:** the response is printed as JSON on stdout, exit code `0`.
+- **Error:** a JSON error envelope is printed on stdout, with a differentiated exit code.
+
+Without `--json`, errors go to stderr as human-readable text and always exit with code `1`.
+
+#### Exit codes (JSON mode only)
+
+| Code | Meaning          | When                                    |
+| ---- | ---------------- | --------------------------------------- |
+| 0    | Success          | Request succeeded                       |
+| 1    | General error    | Unexpected / unknown error              |
+| 2    | Usage error      | Missing flag, unknown command, bad args |
+| 22   | Validation error | API returned 400 or 422                 |
+| 77   | Auth error       | API returned 401                        |
+| 78   | Not found        | API returned 404                        |
+| 79   | Forbidden        | API returned 403                        |
+| 80   | Conflict         | API returned 409                        |
+
+Non-JSON mode always exits `0` on success and `1` on any error.
+
+#### Error envelope
+
+```json
+{
+  "error": {
+    "exitCode": 2,
+    "code": "missing_flag",
+    "message": "Missing required flag: --name. Provide it or run interactively.",
+    "flag": "name"
+  }
+}
+```
+
+- `code` is a machine-readable string: `usage_error`, `missing_flag`, `invalid_json`, `unknown_error`, or the API's own error code (e.g. `not_found`, `ingredient_name_conflict`).
+- `flag` is present only when `code` is `missing_flag`, naming the missing flag.
+
+#### Pagination envelope
+
+List commands with `--json` wrap results with pagination metadata:
+
+```json
+{
+  "data": [ ... ],
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "hasMore": true
+  }
+}
+```
+
+`hasMore` is computed by over-fetching one extra row. If you pass `--limit 100` (API maximum), `hasMore` will always be `false` since the CLI cannot fetch 101 rows to check.
+
+Day-plans `list` does not include `pagination` (it uses date-range filtering, not limit/offset).
 
 ---
 
@@ -475,7 +541,8 @@ src/cli/
 ├── types.ts              Shared ParsedFlags interface
 ├── config.ts             API URL, token loading, file persistence
 ├── client.ts             ApiClient (typed fetch wrapper), ApiClientError
-├── prompt.ts             Interactive prompts, hidden input, TTY detection
+├── errors.ts             CliError, exit code mapping, error envelope
+├── prompt.ts             Interactive prompts, hidden input, TTY detection, MissingFlagError
 ├── format.ts             Table, record, date, JSON formatting
 └── commands/
     ├── auth.ts           login, register, logout, whoami, profile

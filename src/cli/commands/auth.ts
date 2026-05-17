@@ -2,6 +2,7 @@ import { client } from '../client';
 import { saveToken, deleteTokenFile } from '../config';
 import { required, requiredHidden, isInteractive } from '../prompt';
 import { formatJson, formatRecord, formatDateTime } from '../format';
+import { usageError } from '../errors';
 import type { ParsedFlags } from '../types';
 import type { AuthTokenEnvelopeDto } from '../../domain/dtos/auth';
 import type { MeResponseDto, UserPublicDto, UserPatchDto } from '../../domain/dtos/user';
@@ -70,7 +71,7 @@ async function register(flags: Record<string, string>, json: boolean): Promise<v
 
   if (password.length < 10) {
     if (!isInteractive()) {
-      throw new Error('Password must be at least 10 characters.');
+      throw usageError('Password must be at least 10 characters.');
     }
     while (password.length < 10) {
       console.error('Password must be at least 10 characters.');
@@ -145,7 +146,7 @@ async function profile(flags: Record<string, string>, json: boolean): Promise<vo
   }
 
   if (Object.keys(body).length === 0) {
-    throw new Error('No fields to update. Use --display-name.');
+    throw usageError('No fields to update. Use --display-name.');
   }
 
   const user = await client.patch<UserPublicDto>('/api/me', body);
