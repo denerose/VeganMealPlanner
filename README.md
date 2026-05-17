@@ -37,3 +37,7 @@ Protected routes expect **`Authorization: Bearer <JWT>`** with a `sub` claim (us
 **Password hashing:** User passwords are stored with **Argon2id** using explicit cost parameters in code (not environment variables) so every environment hashes consistently: **19 MiB** memory (`memoryCost` 19456 KiB), **2** time passes, **parallelism 1**, matching the [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) minimum recommendation for deployments with less than 64 GiB RAM. See `src/api/password.ts` (`ARGON2_PASSWORD_OPTIONS`).
 
 The published HTTP contract is **`contracts/openapi.yaml`** (OpenAPI 3). Unit tests validate this spec (`tests/unit/contracts/openapi.test.ts`); run `bun run test:unit` or `./scripts/check.sh` after changing the API or the contract. Use `./scripts/check-all.sh` / `bun run check-all` only if you also need integration coverage for that change (see **Full check with integration tests** above).
+
+## CLI
+
+A command-line client (`vmp`) is included for interacting with a running API from the terminal — authenticating, managing ingredients, meals, day plans, and household. See **[docs/cli.md](docs/cli.md)** for full usage documentation.

@@ -22,6 +22,19 @@ This project uses **Bun** as the runtime.
 
 See [README.md](README.md) for more.
 
+## CLI (`vmp`)
+
+A CLI client lives under `src/cli/`. Run it with `bun run cli -- <command>` or see **[docs/cli.md](docs/cli.md)** for full documentation. The CLI is a pure TypeScript HTTP client — it does not start a server or connect to the database directly. It talks to the API via the same HTTP contract documented in `contracts/openapi.yaml`.
+
+Key points for agents modifying the CLI:
+
+- **No new runtime dependencies.** Use `Bun.argv`, `fetch`, and built-in modules only.
+- **Keep command help text in sync** when adding or changing flags.
+- **Run `bun run check`** after changes (typecheck, lint, format, unit tests cover `tests/unit/cli/`).
+- **Interactive prompts** use `src/cli/prompt.ts` — when stdin is not a TTY, they throw with a message naming the missing flag. Do not add `readline` or other input libraries.
+- **Shared types** are in `src/cli/types.ts`. Command handlers import `ParsedFlags` from there, not from a local interface.
+- **Token persistence** is file-based (`~/.vmp-token`). The `ApiClient.reset()` method must be called after `saveToken()` so the singleton picks up the new credentials.
+
 ## Conventions
 
 ### Use Bun instead of Node.js
