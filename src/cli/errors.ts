@@ -79,3 +79,43 @@ export function usageError(message: string): CliError {
 export function apiErrorFromClient(error: ApiClientError): CliError {
   return new CliError(apiStatusToExitCode(error.status), error.code, error.message);
 }
+
+/**
+ * Normalise any thrown value into a CliError.
+ *
+ * - `CliError` → pass through
+ * - `ApiClientError` → map via `apiErrorFromClient`
+ * - `Error` → wrap as `CliError(1, 'unknown_error', ...)`
+ * - anything else → rethrow
+ */
+export function toCliError(e: unknown): CliError {
+  if (e instanceof CliError) {
+    return e;
+  }
+  if (e instanceof ApiClientError) {
+    return apiErrorFromClient(e);
+  }
+  if (e instanceof Error) {
+    return new CliError(1, 'unknown_error', e.message);
+  }
+  throw e;
+}
+
+/**
+ * Handle an error consistently:
+ * - `--json` mode → JSON error envelope on **stdout**, differentiated exit code
+ * - human mode → `"Error: <msg>"` on **stderr**, exit code 1
+ *
+ * This function never returns (calls `process.exit`).
+ */
+export function handleError(e: unknown, json: boolean): never {
+  const cliError = toCliError(e);
+
+  if (json) {
+    console.log(JSON.stringify(cliError.toJSON(), null, 2));
+    process.exit(cliError.exitCode);
+  } else {
+    console.error(`Error: ${cliError.message}`);
+    process.exit(1);
+  }
+}

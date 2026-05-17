@@ -4,8 +4,8 @@ import { handleIngredients } from './commands/ingredients';
 import { handleMeals } from './commands/meals';
 import { handleDayPlans } from './commands/day-plans';
 import { handleHousehold } from './commands/household';
-import { ApiClientError, client } from './client';
-import { CliError, apiErrorFromClient, usageError } from './errors';
+import { client } from './client';
+import { handleError, usageError } from './errors';
 import type { ParsedFlags } from './types';
 
 const HELP = `Usage: vmp <command> [subcommand] [flags]
@@ -34,6 +34,7 @@ Run "vmp <command>" without a subcommand to see subcommand help.
 interface ParsedArgs {
   json: boolean;
   apiUrl?: string;
+  apiUrlMissing?: boolean;
   command: string | undefined;
   args: string[];
   flags: Record<string, string>;
@@ -65,8 +66,16 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (arg === '--api-url') {
       const val = raw[i + 1];
       if (!val || val.startsWith('--')) {
-        console.error(`Error: --api-url requires a value.`);
-        process.exit(1);
+        // Deferred to main() so it goes through handleError()
+        return {
+          json,
+          apiUrl: undefined,
+          apiUrlMissing: true,
+          command: undefined,
+          args: [],
+          flags: {},
+          help: false,
+        };
       }
       apiUrl = val;
       i += 2;
@@ -98,33 +107,6 @@ function parseArgs(argv: string[]): ParsedArgs {
   };
 }
 
-/**
- * Handle an error consistently:
- * - `--json` mode → JSON error envelope on stdout, differentiated exit code
- * - human mode → "Error: <msg>" on stderr, exit code 1
- */
-function handleError(e: unknown, json: boolean): never {
-  let cliError: CliError;
-
-  if (e instanceof CliError) {
-    cliError = e;
-  } else if (e instanceof ApiClientError) {
-    cliError = apiErrorFromClient(e);
-  } else if (e instanceof Error) {
-    cliError = new CliError(1, 'unknown_error', e.message);
-  } else {
-    throw e; // rethrow unexpected non-Error values
-  }
-
-  if (json) {
-    console.log(JSON.stringify(cliError.toJSON(), null, 2));
-    process.exit(cliError.exitCode);
-  } else {
-    console.error(`Error: ${cliError.message}`);
-    process.exit(1);
-  }
-}
-
 async function main(): Promise<void> {
   const parsed = parseArgs(Bun.argv);
 
@@ -147,7 +129,15 @@ async function main(): Promise<void> {
     sub.flags = {};
   }
 
+  // --api-url validation: throw through the try/catch so it gets proper
+  // JSON error handling when --json is set.
+  const apiUrlMissing = parsed.apiUrlMissing;
+
   try {
+    if (apiUrlMissing) {
+      throw usageError('--api-url requires a value.');
+    }
+
     switch (parsed.command) {
       case 'auth':
         await handleAuth(sub);
