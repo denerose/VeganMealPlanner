@@ -1,6 +1,6 @@
 # Data model
 
-Use this page to find **where the data model is defined** and **what to update when it changes**. It is independent of any single implementation or VOM plan.
+Use this page to find **where the data model is defined** and **what to update when it changes**.
 
 ## Quick links
 
@@ -33,7 +33,7 @@ For field-level detail and rules, use the spec and Prisma schema above.
 2. **`docs/data-model.md`** — update this file whenever the data model changes.
 3. **`src/domain`** and **`contracts/openapi.yaml`** — when types or HTTP contracts are affected.
 
-For **HTTP validation** status codes, the REST API spec ([`docs/superpowers/specs/2026-03-28-rest-api-design.md`](superpowers/specs/2026-03-28-rest-api-design.md)) uses **`422`** for request validation.
+For **HTTP validation** status codes, the API uses **`422`** for request validation (see `contracts/openapi.yaml`).
 
 Same PR as the schema change is ideal so docs never lag behind main.
 
