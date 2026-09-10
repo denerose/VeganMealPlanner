@@ -17,6 +17,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Typecheck needs the generated Prisma client; Prisma 7 does not
+      # generate it automatically on install.
+      - name: Generate Prisma client
+        run: bunx prisma generate
+
       # Same gate as ./scripts/check.sh — no database required.
       # Integration tests (bun run test:integration) are intentionally not run
       # in CI: they need Postgres and operate on a live dataset.
