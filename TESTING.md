@@ -53,7 +53,7 @@ Nested `describe` blocks with **different** lifecycle needs, **one-off** setup, 
 
 Tests under [`tests/integration/api/`](tests/integration/api/) hit `createFetchHandler` with a real database. When you add or change a path under `/api/*` in [`contracts/openapi.yaml`](contracts/openapi.yaml):
 
-1. Update the `DOCUMENTED_API_PATHS` list in [`tests/unit/contracts/openapi.test.ts`](tests/unit/contracts/openapi.test.ts).
+1. Add the route to the **`ROUTES` table in `src/api/router.ts`** (single source of truth — dispatch, 405 `Allow` headers, and the parity test all derive from it) and update [`contracts/openapi.yaml`](contracts/openapi.yaml) in the same change. [`tests/unit/api/router-contract.test.ts`](tests/unit/api/router-contract.test.ts) fails if the table and the contract drift apart.
 2. Add or extend tests in the file(s) below (and extend this table if you introduce a new area).
 
 | OpenAPI area                                       | Primary test file(s)                                                                   |

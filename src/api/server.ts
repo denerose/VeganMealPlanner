@@ -5,7 +5,7 @@ import { resolveAuthUserId } from './auth';
 import { jsonError } from './errors';
 import { ApiProblem } from './api-problem';
 import { getHouseholdForUser } from './services/tenancy';
-import { apiAllowedMethodsForPathname, dispatchApi } from './router';
+import { apiAllowedMethodsForPathname, dispatchApi, healthResponse } from './router';
 import {
   assertJwtAccessConfigLoaded,
   assertJwtSecretMeetsMinUtf8LengthOrThrow,
@@ -17,12 +17,6 @@ const PORT = Number(process.env.PORT) || 3000;
 
 export type PrismaLike = { $connect(): Promise<void> };
 
-const AUTH_DOCUMENTED_PATHS = [
-  '/api/auth/register',
-  '/api/auth/login',
-  '/api/auth/logout',
-] as const;
-
 export function createFetchHandler(db: PrismaClient) {
   return async function handleRequest(req: Request): Promise<Response> {
     const url = new URL(req.url);
@@ -31,14 +25,10 @@ export function createFetchHandler(db: PrismaClient) {
 
     if (path === '/api/health') {
       if (method === 'GET') {
-        try {
-          await db.$connect();
-          return Response.json({ status: 'ok' }, { status: 200 });
-        } catch {
-          return Response.json({ status: 'error' }, { status: 503 });
-        }
+        return await healthResponse(db);
       }
-      return new Response(null, { status: 405, headers: { Allow: 'GET' } });
+      const allow = apiAllowedMethodsForPathname(path)!;
+      return new Response(null, { status: 405, headers: { Allow: allow.join(', ') } });
     }
 
     try {
@@ -49,7 +39,8 @@ export function createFetchHandler(db: PrismaClient) {
         return await handlePostLogin(req, db);
       }
 
-      if ((AUTH_DOCUMENTED_PATHS as readonly string[]).includes(path)) {
+      // Auth paths: reject wrong methods with 405 before authentication.
+      if (path.startsWith('/api/auth/')) {
         const allow = apiAllowedMethodsForPathname(path);
         if (allow && !allow.includes(method)) {
           return new Response(null, { status: 405, headers: { Allow: allow.join(', ') } });

@@ -59,7 +59,9 @@ Default to using Bun instead of Node.js, npm, pnpm, or vite.
 
 When you change HTTP routes, methods, status codes, or JSON response bodies under `src/api/`, update `contracts/openapi.yaml` in the **same change set** so the published contract matches the implementation.
 
-Before finishing, run `bun test tests/unit/contracts/openapi.test.ts`, or `bun run test:unit`, or `./scripts/check.sh` so OpenAPI validation still passes. Use `./scripts/check-all.sh` / `bun run check-all` **only** if you changed integration tests or need HTTP-level coverage that unit tests do not provide.
+**Routes live in one place:** add or change routes in the **`ROUTES` table in `src/api/router.ts`**. Dispatch, 405 `Allow` headers, and `tests/unit/api/router-contract.test.ts` (which asserts the table matches `contracts/openapi.yaml` exactly — paths and methods) all derive from that table. If you edit the contract or the table without the other, that test fails.
+
+Before finishing, run `bun test tests/unit/api/router-contract.test.ts tests/unit/contracts/openapi.test.ts`, or `bun run test:unit`, or `./scripts/check.sh` so OpenAPI validation still passes. Use `./scripts/check-all.sh` / `bun run check-all` **only** if you changed integration tests or need HTTP-level coverage that unit tests do not provide.
 
 ### Prisma migrations
 
