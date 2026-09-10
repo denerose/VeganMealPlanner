@@ -1,6 +1,5 @@
 {
   "name": "veganmealplanner",
-  "module": "index.ts",
   "bin": {
     "vmp": "src/cli/index.ts"
   },
