@@ -5,6 +5,8 @@ import {
   resetHouseholdIntegrationData,
   type SeedHouseholdUserResult,
   seedHouseholdUser,
+  seedHouseholdMember,
+  teardownHouseholdMember,
   teardownHouseholdUser,
 } from './helpers';
 
@@ -69,5 +71,30 @@ describe('POST /api/household/invitations (integration)', () => {
       })
     );
     expect(res.status).toBe(422);
+  });
+
+  test('403 not_household_owner for a MEMBER with no invitation row created', async () => {
+    const member = await seedHouseholdMember(seeded.householdId);
+    try {
+      const res = await handler(
+        new Request('http://localhost/api/household/invitations', {
+          method: 'POST',
+          headers: {
+            'X-Dev-User-Id': member.userId,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: `guest-${crypto.randomUUID()}@integration.test` }),
+        })
+      );
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('not_household_owner');
+      const count = await prisma.householdInvitation.count({
+        where: { householdId: seeded.householdId },
+      });
+      expect(count).toBe(0);
+    } finally {
+      await teardownHouseholdMember(member.userId);
+    }
   });
 });
