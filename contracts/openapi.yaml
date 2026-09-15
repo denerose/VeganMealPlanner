@@ -136,7 +136,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/ForbiddenUserNotInHousehold'
+          $ref: '#/components/responses/ForbiddenOwnerRequired'
         '422':
           $ref: '#/components/responses/Unprocessable'
 
@@ -213,6 +213,8 @@ paths:
                 $ref: '#/components/schemas/Household'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnerRequired'
         '422':
           $ref: '#/components/responses/Unprocessable'
 
@@ -755,6 +757,16 @@ components:
             user_not_in_household:
               value:
                 code: user_not_in_household
+    ForbiddenOwnerRequired:
+      description: Authenticated user is not an OWNER of the household
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          examples:
+            not_household_owner:
+              value:
+                code: not_household_owner
     MultipleHouseholdMemberships:
       description: Authenticated user has more than one household membership
       content:

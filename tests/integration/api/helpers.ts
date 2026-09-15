@@ -24,6 +24,31 @@ export async function seedHouseholdUser(): Promise<SeedHouseholdUserResult> {
 }
 
 /**
+ * Creates a user with a MEMBER membership in an existing household
+ * (cleanup via teardownHouseholdMember).
+ */
+export async function seedHouseholdMember(householdId: string): Promise<{
+  userId: string;
+  email: string;
+}> {
+  const user = await prisma.user.create({
+    data: {
+      email: `member-${crypto.randomUUID()}@integration.test`,
+      passwordHash: null,
+    },
+  });
+  await prisma.householdMembership.create({
+    data: { userId: user.id, householdId, role: 'MEMBER' },
+  });
+  return { userId: user.id, email: user.email };
+}
+
+/** Deletes a seeded household member user (membership cascades). */
+export async function teardownHouseholdMember(userId: string): Promise<void> {
+  await prisma.user.delete({ where: { id: userId } });
+}
+
+/**
  * Deletes day plans, meals, and ingredients for a household so the next test starts clean.
  * Keeps the household, membership, and user (use between tests in a describe block).
  */

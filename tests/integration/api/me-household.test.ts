@@ -5,6 +5,8 @@ import {
   resetHouseholdIntegrationData,
   type SeedHouseholdUserResult,
   seedHouseholdUser,
+  seedHouseholdMember,
+  teardownHouseholdMember,
   teardownHouseholdUser,
 } from './helpers';
 
@@ -211,6 +213,32 @@ describe('PATCH /api/me, /api/household, /api/household/members', () => {
     const body = (await res.json()) as { id: string; name: string | null };
     expect(body.id).toBe(householdId);
     expect(body.name).toBe('Renamed Plant Kitchen');
+  });
+
+  test('PATCH /api/household as MEMBER is 403 not_household_owner', async () => {
+    const { householdId } = seeded!;
+    const member = await seedHouseholdMember(householdId);
+    try {
+      const res = await handler(
+        new Request('http://localhost/api/household', {
+          method: 'PATCH',
+          headers: {
+            'X-Dev-User-Id': member.userId,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: 'Member Seized Kitchen' }),
+        })
+      );
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('not_household_owner');
+      const household = await prisma.household.findUniqueOrThrow({
+        where: { id: householdId },
+      });
+      expect(household.name).toBe(`H-${seeded!.suffix}`);
+    } finally {
+      await teardownHouseholdMember(member.userId);
+    }
   });
 
   test('GET /api/household/members includes seeded owner', async () => {

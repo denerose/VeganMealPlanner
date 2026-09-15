@@ -31,6 +31,8 @@ Keep the seeded context typed as `SeedHouseholdUserResult | undefined`, assign i
 
 **Second household:** If a test needs another household (for example a meal that must not belong to the primary household), call `seedHouseholdUser()` inside that test and call `teardownHouseholdUser` in a `finally` block so cleanup always runs.
 
+**Extra member:** If a test needs a non-OWNER member of the shared household, call `seedHouseholdMember(householdId)` inside that test and `teardownHouseholdMember(userId)` in a `finally` block.
+
 ### Rule: keep `resetHouseholdIntegrationData` complete
 
 **If you add a Prisma model (or any persisted rows) scoped by `householdId`, update [`resetHouseholdIntegrationData`](tests/integration/api/helpers.ts)** so `afterEach` still removes all mutable data for that household. Otherwise later tests can see leaked rows and become order-dependent or flaky.

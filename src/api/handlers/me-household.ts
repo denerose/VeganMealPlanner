@@ -4,6 +4,7 @@ import { toHouseholdId, toUserId } from '../../domain/types/ids';
 import { readJsonBody } from '../parse';
 import { ApiProblem } from '../api-problem';
 import { asObject, optionalNullableString } from '../validate';
+import { requireHouseholdOwner } from '../services/tenancy';
 
 export interface ApiContext {
   prisma: PrismaClient;
@@ -90,6 +91,7 @@ export async function handleGetHousehold(ctx: ApiContext): Promise<Response> {
 }
 
 export async function handlePatchHousehold(req: Request, ctx: ApiContext): Promise<Response> {
+  await requireHouseholdOwner(ctx.prisma, ctx.userId, ctx.householdId);
   const dto = parseHouseholdPatch(await readJsonBody<unknown>(req));
   const h = await ctx.prisma.household.update({
     where: { id: ctx.householdId },
