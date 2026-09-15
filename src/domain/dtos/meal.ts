@@ -36,13 +36,13 @@ export interface MealCreateDto {
   recipeUrl?: string | null;
   imageId?: string | null;
   qualities?: Partial<MealQualitiesDto>;
-  heroIngredientIds?: { ingredientId: IngredientId; sortOrder: number }[];
+  heroIngredientIds?: { ingredientId: IngredientId; sortOrder?: number }[];
   cookedByUserIds?: UserId[];
 }
 
 export type MealUpdateDto = Partial<
   Omit<MealCreateDto, 'heroIngredientIds' | 'cookedByUserIds'>
 > & {
-  heroIngredientIds?: { ingredientId: IngredientId; sortOrder: number }[];
+  heroIngredientIds?: { ingredientId: IngredientId; sortOrder?: number }[];
   cookedByUserIds?: UserId[];
 };

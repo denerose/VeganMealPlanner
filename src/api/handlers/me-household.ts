@@ -3,11 +3,24 @@ import type { HouseholdPatchDto, MeResponseDto, UserPatchDto } from '../../domai
 import { toHouseholdId, toUserId } from '../../domain/types/ids';
 import { readJsonBody } from '../parse';
 import { ApiProblem } from '../api-problem';
+import { asObject, optionalNullableString } from '../validate';
 
 export interface ApiContext {
   prisma: PrismaClient;
   userId: string;
   householdId: string;
+}
+
+/** Validates user patch JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseUserPatch(body: unknown): UserPatchDto {
+  const o = asObject(body);
+  return { displayName: optionalNullableString(o, 'displayName') };
+}
+
+/** Validates household patch JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseHouseholdPatch(body: unknown): HouseholdPatchDto {
+  const o = asObject(body);
+  return { name: optionalNullableString(o, 'name') };
 }
 
 export async function handleGetMe(ctx: ApiContext): Promise<Response> {
@@ -48,7 +61,7 @@ export async function handleGetMe(ctx: ApiContext): Promise<Response> {
 }
 
 export async function handlePatchMe(req: Request, ctx: ApiContext): Promise<Response> {
-  const dto = await readJsonBody<UserPatchDto>(req);
+  const dto = parseUserPatch(await readJsonBody<unknown>(req));
   const updated = await ctx.prisma.user.update({
     where: { id: ctx.userId },
     data: {
@@ -77,7 +90,7 @@ export async function handleGetHousehold(ctx: ApiContext): Promise<Response> {
 }
 
 export async function handlePatchHousehold(req: Request, ctx: ApiContext): Promise<Response> {
-  const dto = await readJsonBody<HouseholdPatchDto>(req);
+  const dto = parseHouseholdPatch(await readJsonBody<unknown>(req));
   const h = await ctx.prisma.household.update({
     where: { id: ctx.householdId },
     data: {

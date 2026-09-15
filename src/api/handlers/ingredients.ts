@@ -4,8 +4,44 @@ import { toIngredientResponseDto } from '../../domain/mappers/ingredient-mapper'
 import type { ApiContext } from './me-household';
 import { readJsonBody, parseLimitOffset } from '../parse';
 import { normalizeIngredientName } from '../../domain/lib/normalize-ingredient-name';
+import { INGREDIENT_STORAGE_TYPES } from '../../domain/types/enums';
 import { ApiProblem } from '../api-problem';
+import {
+  asObject,
+  optionalBoolean,
+  optionalEnum,
+  optionalString,
+  requiredEnum,
+  requiredString,
+} from '../validate';
 import { rethrowPrisma } from '../services/prisma-map';
+import { requireScoped } from '../services/require-scoped';
+
+/** Validates ingredient create JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseIngredientCreate(body: unknown): IngredientCreateDto {
+  const o = asObject(body);
+  return {
+    name: requiredString(o, 'name'),
+    storageType: requiredEnum(o, 'storageType', INGREDIENT_STORAGE_TYPES),
+    perishable: optionalBoolean(o, 'perishable'),
+  };
+}
+
+/** Validates ingredient update JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseIngredientUpdate(body: unknown): IngredientUpdateDto {
+  const o = asObject(body);
+  const dto: IngredientUpdateDto = {};
+  const name = optionalString(o, 'name');
+  if (name !== undefined) {
+    if (name.trim() === '') throw new ApiProblem(422, 'invalid_body', 'name must not be empty');
+    dto.name = name;
+  }
+  const storageType = optionalEnum(o, 'storageType', INGREDIENT_STORAGE_TYPES);
+  if (storageType !== undefined) dto.storageType = storageType;
+  const perishable = optionalBoolean(o, 'perishable');
+  if (perishable !== undefined) dto.perishable = perishable;
+  return dto;
+}
 
 export async function handleListIngredients(url: URL, ctx: ApiContext): Promise<Response> {
   const { limit, offset } = parseLimitOffset(url);
@@ -19,13 +55,7 @@ export async function handleListIngredients(url: URL, ctx: ApiContext): Promise<
 }
 
 export async function handlePostIngredient(req: Request, ctx: ApiContext): Promise<Response> {
-  const dto = await readJsonBody<IngredientCreateDto>(req);
-  if (!dto.name?.trim()) {
-    throw new ApiProblem(422, 'invalid_body', 'name is required');
-  }
-  if (!dto.storageType) {
-    throw new ApiProblem(422, 'invalid_body', 'storageType is required');
-  }
+  const dto = parseIngredientCreate(await readJsonBody<unknown>(req));
   const normalized = normalizeIngredientName(dto.name);
   try {
     const row = await ctx.prisma.ingredient.create({
@@ -53,12 +83,11 @@ export async function handleGetIngredient(
   ingredientId: string,
   ctx: ApiContext
 ): Promise<Response> {
-  const row = await ctx.prisma.ingredient.findFirst({
-    where: { id: ingredientId, householdId: ctx.householdId },
-  });
-  if (!row) {
-    throw new ApiProblem(404, 'not_found', 'Ingredient not found');
-  }
+  const row = await requireScoped('Ingredient', () =>
+    ctx.prisma.ingredient.findFirst({
+      where: { id: ingredientId, householdId: ctx.householdId },
+    })
+  );
   return Response.json(toIngredientResponseDto(row));
 }
 
@@ -67,22 +96,18 @@ export async function handlePatchIngredient(
   req: Request,
   ctx: ApiContext
 ): Promise<Response> {
-  const dto = await readJsonBody<IngredientUpdateDto>(req);
-  const existing = await ctx.prisma.ingredient.findFirst({
-    where: { id: ingredientId, householdId: ctx.householdId },
-  });
-  if (!existing) {
-    throw new ApiProblem(404, 'not_found', 'Ingredient not found');
-  }
+  const dto = parseIngredientUpdate(await readJsonBody<unknown>(req));
+  await requireScoped('Ingredient', () =>
+    ctx.prisma.ingredient.findFirst({
+      where: { id: ingredientId, householdId: ctx.householdId },
+    })
+  );
   const data: {
     name?: string;
     storageType?: IngredientStorageType;
     perishable?: boolean;
   } = {};
-  if (dto.name !== undefined) {
-    if (!dto.name.trim()) throw new ApiProblem(422, 'invalid_body', 'name must not be empty');
-    data.name = normalizeIngredientName(dto.name);
-  }
+  if (dto.name !== undefined) data.name = normalizeIngredientName(dto.name);
   if (dto.storageType !== undefined) data.storageType = dto.storageType;
   if (dto.perishable !== undefined) data.perishable = dto.perishable;
   try {
@@ -107,12 +132,11 @@ export async function handleDeleteIngredient(
   ingredientId: string,
   ctx: ApiContext
 ): Promise<Response> {
-  const existing = await ctx.prisma.ingredient.findFirst({
-    where: { id: ingredientId, householdId: ctx.householdId },
-  });
-  if (!existing) {
-    throw new ApiProblem(404, 'not_found', 'Ingredient not found');
-  }
+  await requireScoped('Ingredient', () =>
+    ctx.prisma.ingredient.findFirst({
+      where: { id: ingredientId, householdId: ctx.householdId },
+    })
+  );
   try {
     await ctx.prisma.ingredient.delete({ where: { id: ingredientId } });
     return new Response(null, { status: 204 });
