@@ -1,11 +1,21 @@
+import type { PrismaClient } from '@prisma/client';
 import { jsonError } from './errors';
 import { isJwtAccessVerifyFailure, verifyAccessToken } from './jwt-access';
 import { isUuid } from './uuid';
 
 export { isUuid } from './uuid';
 
-/** Resolve `User.id` from request headers, or return a JSON error `Response`. */
-export async function resolveAuthUserId(req: Request): Promise<string | Response> {
+/**
+ * Resolve `User.id` from request headers, or return a JSON error `Response`.
+ *
+ * Production-style bearer JWT auth also checks the user's `tokensValidAfter` revocation epoch:
+ * tokens whose `iat` predates it are rejected (logout bumps the epoch, revoking all outstanding
+ * tokens for the user). The dev-mode `X-Dev-User-Id` header bypass is NOT revocable and ignores prisma.
+ */
+export async function resolveAuthUserId(
+  req: Request,
+  prisma: PrismaClient
+): Promise<string | Response> {
   const mode = process.env.AUTH_MODE ?? 'production';
   const devHeader = req.headers.get('X-Dev-User-Id');
 
@@ -37,9 +47,19 @@ export async function resolveAuthUserId(req: Request): Promise<string | Response
   }
 
   try {
-    const { sub } = await verifyAccessToken(token);
+    const { sub, iat } = await verifyAccessToken(token);
     if (!isUuid(sub)) {
       return jsonError(401, 'invalid_token', 'Access token subject must be a valid UUID');
+    }
+    // Second-granularity comparison is deliberate: a token re-issued in the same wall-clock
+    // second as a logout survives (iat == epoch second), at the cost of a <=1s revocation gap
+    // for tokens issued earlier within that same second — acceptable for this scale.
+    const user = await prisma.user.findUnique({
+      where: { id: sub },
+      select: { tokensValidAfter: true },
+    });
+    if (!user || iat < Math.floor(user.tokensValidAfter.getTime() / 1000)) {
+      return jsonError(401, 'invalid_token', 'Invalid or expired access token');
     }
     return sub;
   } catch (e) {

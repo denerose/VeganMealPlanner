@@ -86,7 +86,7 @@ const ROUTES: readonly RouteDef[] = [
   {
     pattern: '/api/auth/logout',
     methods: {
-      POST: (req) => handlePostLogout(req),
+      POST: (req, _url, _params, ctx) => handlePostLogout(req, ctx.prisma, ctx.userId),
     },
   },
   {

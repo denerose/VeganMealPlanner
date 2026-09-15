@@ -300,6 +300,69 @@ describe('Auth API (integration, production auth)', () => {
     expect(res.status).toBe(204);
   });
 
+  test('logout revokes outstanding access tokens until a fresh login', async () => {
+    const suffix = crypto.randomUUID();
+    const email = `revoke-${suffix}@integration.test`;
+    const password = 'revokepass123';
+    const reg = await handler(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, displayName: 'Tempeh Fan' }),
+      })
+    );
+    const staleToken = ((await reg.json()) as { accessToken: string }).accessToken;
+
+    // Outstanding bearer works before logout.
+    const meBefore = await handler(
+      new Request('http://localhost/api/me', {
+        headers: { Authorization: `Bearer ${staleToken}` },
+      })
+    );
+    expect(meBefore.status).toBe(200);
+
+    // Ensure the logout second is strictly after the token's iat second (second-granularity epochs).
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+
+    const logout = await handler(
+      new Request('http://localhost/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${staleToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      })
+    );
+    expect(logout.status).toBe(204);
+
+    // Same bearer is now revoked.
+    const meAfter = await handler(
+      new Request('http://localhost/api/me', {
+        headers: { Authorization: `Bearer ${staleToken}` },
+      })
+    );
+    expect(meAfter.status).toBe(401);
+    expect(((await meAfter.json()) as { code: string }).code).toBe('invalid_token');
+
+    // A fresh login mints a working token again.
+    const login = await handler(
+      new Request('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+    );
+    expect(login.status).toBe(200);
+    const freshToken = ((await login.json()) as { accessToken: string }).accessToken;
+    const meFresh = await handler(
+      new Request('http://localhost/api/me', {
+        headers: { Authorization: `Bearer ${freshToken}` },
+      })
+    );
+    expect(meFresh.status).toBe(200);
+  });
+
   test('GET /api/auth/register returns 405 Allow POST', async () => {
     const res = await handler(new Request('http://localhost/api/auth/register', { method: 'GET' }));
     expect(res.status).toBe(405);
@@ -333,5 +396,28 @@ describe('POST /api/auth/logout (development)', () => {
       })
     );
     expect(res.status).toBe(204);
+  });
+
+  // Documents that the dev-mode header bypass is NOT revocable: logout bumps the epoch,
+  // but dev-header auth never consults it.
+  test('dev-header calls still succeed after logout bumps the epoch', async () => {
+    const logout = await handler(
+      new Request('http://localhost/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'X-Dev-User-Id': seeded.userId,
+          'Content-Type': 'application/json',
+        },
+        body: '',
+      })
+    );
+    expect(logout.status).toBe(204);
+
+    const me = await handler(
+      new Request('http://localhost/api/me', {
+        headers: { 'X-Dev-User-Id': seeded.userId },
+      })
+    );
+    expect(me.status).toBe(200);
   });
 });
