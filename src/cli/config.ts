@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { chmod, readFile, unlink } from 'node:fs/promises';
+import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 
 export const TOKEN_FILE = `${homedir()}/.vmp-token`;
 
@@ -48,11 +48,15 @@ async function readTokenFile(): Promise<string | null> {
 }
 
 export async function saveToken(token: string): Promise<void> {
-  // `mode` applies at creation, so a fresh token file is never briefly world-readable
-  // (the old write-then-chmod had that race). The trailing chmod only exists to fix
-  // pre-existing files created with looser permissions.
-  await Bun.write(TOKEN_FILE, token, { mode: 0o600 });
-  await chmod(TOKEN_FILE, 0o600);
+  // Tighten any pre-existing file *before* writing the new secret into it.
+  try {
+    await chmod(TOKEN_FILE, 0o600);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+  }
+  // `mode` applies at creation (umask-safe), so a fresh token file is never briefly
+  // world-readable. (Bun.write's `mode` option is ignored — do not switch back.)
+  await writeFile(TOKEN_FILE, token, { mode: 0o600 });
 }
 
 export async function deleteTokenFile(): Promise<void> {
