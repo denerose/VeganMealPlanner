@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import type { AuthTokenEnvelopeDto } from '../../domain/dtos/auth';
 import { toUserId } from '../../domain/types/ids';
@@ -258,6 +258,9 @@ export async function register(prisma: PrismaClient, body: unknown): Promise<Aut
 
 const INVALID_LOGIN_MESSAGE = 'Invalid email or password';
 
+/** Lazily computed hash used to equalize timing for unknown emails. */
+let dummyPasswordHash: string | null = null;
+
 /**
  * Login with normalized email + password. Unknown email, wrong password, and OAuth-only users share one message.
  */
@@ -265,6 +268,10 @@ export async function login(prisma: PrismaClient, body: unknown): Promise<AuthTo
   const { email, password } = parseLoginBody(body);
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user?.passwordHash) {
+    // Burn one Argon2 verify so this path costs the same as a wrong password;
+    // otherwise unknown emails are enumerable by response timing.
+    dummyPasswordHash ??= await hashPassword(randomUUID());
+    await verifyPassword(password, dummyPasswordHash);
     throw new ApiProblem(401, 'invalid_credentials', INVALID_LOGIN_MESSAGE);
   }
   const ok = await verifyPassword(password, user.passwordHash);

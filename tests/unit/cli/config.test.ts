@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
 import { loadConfig, saveToken, deleteTokenFile, TOKEN_FILE } from '../../../src/cli/config';
-import { writeFile, readFile, unlink } from 'node:fs/promises';
+import { writeFile, readFile, unlink, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 // Save and restore env vars so tests don't leak state
@@ -124,6 +124,19 @@ describe('saveToken', () => {
     await saveToken('new-token');
     const content = await readFile(TOKEN_FILE, 'utf-8');
     expect(content).toBe('new-token');
+  });
+
+  test('creates the token file with owner-only permissions (0600)', async () => {
+    await saveToken('mode-test-token');
+    const st = await stat(TOKEN_FILE);
+    expect(st.mode & 0o777).toBe(0o600);
+  });
+
+  test('re-asserts 0600 on a pre-existing file with loose permissions', async () => {
+    await writeFile(TOKEN_FILE, 'old-token', { mode: 0o644 });
+    await saveToken('new-token');
+    const st = await stat(TOKEN_FILE);
+    expect(st.mode & 0o777).toBe(0o600);
   });
 });
 

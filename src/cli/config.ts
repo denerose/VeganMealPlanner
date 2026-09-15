@@ -48,8 +48,15 @@ async function readTokenFile(): Promise<string | null> {
 }
 
 export async function saveToken(token: string): Promise<void> {
-  await writeFile(TOKEN_FILE, token, 'utf-8');
-  await chmod(TOKEN_FILE, 0o600);
+  // Tighten any pre-existing file *before* writing the new secret into it.
+  try {
+    await chmod(TOKEN_FILE, 0o600);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+  }
+  // `mode` applies at creation (umask-safe), so a fresh token file is never briefly
+  // world-readable. (Bun.write's `mode` option is ignored — do not switch back.)
+  await writeFile(TOKEN_FILE, token, { mode: 0o600 });
 }
 
 export async function deleteTokenFile(): Promise<void> {

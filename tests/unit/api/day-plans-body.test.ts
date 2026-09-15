@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { ApiProblem } from '../../../src/api/api-problem';
 import { toMealId } from '../../../src/domain/types/ids';
 import {
+  DAY_PLAN_BULK_MAX_ITEMS,
   parseDayPlanBulk,
   parseDayPlanCreate,
   parseDayPlanUpdate,
@@ -117,5 +118,26 @@ describe('parseDayPlanBulk', () => {
   it('rejects wrong-typed meal ids on items', () => {
     const e = catchProblem(() => parseDayPlanBulk([{ date: '2026-05-20', dinnerMealId: 5 }]));
     expectApiProblem(e, 422, 'invalid_body', 'dinnerMealId must be a string or null');
+  });
+
+  it('accepts exactly the maximum number of items', () => {
+    const items = Array.from({ length: DAY_PLAN_BULK_MAX_ITEMS }, (_, i) => ({
+      date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10),
+    }));
+    const parsed = parseDayPlanBulk(items);
+    expect(parsed).toHaveLength(DAY_PLAN_BULK_MAX_ITEMS);
+  });
+
+  it('rejects arrays longer than the maximum', () => {
+    const items = Array.from({ length: DAY_PLAN_BULK_MAX_ITEMS + 1 }, (_, i) => ({
+      date: new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10),
+    }));
+    const e = catchProblem(() => parseDayPlanBulk(items));
+    expectApiProblem(
+      e,
+      422,
+      'invalid_body',
+      `Bulk requests are limited to ${DAY_PLAN_BULK_MAX_ITEMS} items`
+    );
   });
 });
