@@ -5,6 +5,7 @@ import { resolveAuthUserId } from './auth';
 import { jsonError } from './errors';
 import { ApiProblem } from './api-problem';
 import { getHouseholdForUser } from './services/tenancy';
+import { withRequestLogging } from './request-logging';
 import { apiAllowedMethodsForPathname, dispatchApi, healthResponse } from './router';
 import {
   assertJwtAccessConfigLoaded,
@@ -18,7 +19,7 @@ const PORT = Number(process.env.PORT) || 3000;
 export type PrismaLike = { $connect(): Promise<void> };
 
 export function createFetchHandler(db: PrismaClient) {
-  return async function handleRequest(req: Request): Promise<Response> {
+  async function handleRequest(req: Request): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname;
     const method = req.method;
@@ -71,7 +72,9 @@ export function createFetchHandler(db: PrismaClient) {
       }
       throw e;
     }
-  };
+  }
+
+  return withRequestLogging(handleRequest);
 }
 
 if (import.meta.main) {
