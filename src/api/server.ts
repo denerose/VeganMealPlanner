@@ -48,11 +48,11 @@ export function createFetchHandler(db: PrismaClient) {
         }
       }
 
-      const auth = await resolveAuthUserId(req);
+      const auth = await resolveAuthUserId(req, db);
       if (auth instanceof Response) return auth;
 
       if (path === '/api/auth/logout' && method === 'POST') {
-        return await handlePostLogout(req);
+        return await handlePostLogout(req, db, auth);
       }
 
       const { householdId } = await getHouseholdForUser(db, auth);

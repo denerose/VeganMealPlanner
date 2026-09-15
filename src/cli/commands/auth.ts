@@ -106,7 +106,7 @@ async function logout(json: boolean): Promise<void> {
   try {
     await client.post('/api/auth/logout', {});
   } catch {
-    // logout endpoint is a no-op on the server; best-effort
+    // server revokes outstanding tokens; best-effort
   }
   await deleteTokenFile();
 

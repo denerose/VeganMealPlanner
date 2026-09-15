@@ -94,7 +94,7 @@ paths:
   /api/auth/logout:
     post:
       tags: [Auth]
-      summary: Log out (client discards token; server no-op in MVP)
+      summary: Log out (revokes all outstanding access tokens for the user)
       operationId: postAuthLogout
       requestBody:
         required: false

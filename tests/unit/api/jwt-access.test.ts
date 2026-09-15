@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { SignJWT } from 'jose';
+import { SignJWT, type JWTPayload } from 'jose';
 import {
   assertJwtAccessConfigLoaded,
   assertJwtSecretMeetsMinUtf8LengthOrThrow,
@@ -60,6 +60,47 @@ describe('jwt-access', () => {
     expect(expiresIn).toBe(3600);
     const { sub } = await verifyAccessToken(token);
     expect(sub).toBe(USER_ID);
+  });
+
+  test('verify returns numeric iat matching the issuance second', async () => {
+    setJwtEnv(SECRET_A, '3600');
+    const before = Math.floor(Date.now() / 1000);
+    const { token } = await signAccessToken(USER_ID);
+    const after = Math.floor(Date.now() / 1000);
+    const { sub, iat } = await verifyAccessToken(token);
+    expect(sub).toBe(USER_ID);
+    expect(typeof iat).toBe('number');
+    expect(iat).toBeGreaterThanOrEqual(before);
+    expect(iat).toBeLessThanOrEqual(after);
+  });
+
+  test('token without iat is rejected as malformed', async () => {
+    setJwtEnv(SECRET_A, '3600');
+    const key = new TextEncoder().encode(SECRET_A);
+    const now = Math.floor(Date.now() / 1000);
+    const noIatToken = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(USER_ID)
+      .setExpirationTime(now + 3600)
+      .sign(key);
+    await expect(verifyAccessToken(noIatToken)).rejects.toBeInstanceOf(
+      JwtAccessTokenMalformedError
+    );
+    await expect(verifyAccessToken(noIatToken)).rejects.toThrow('Access token missing iat claim');
+  });
+
+  test('token with non-numeric iat is rejected as malformed', async () => {
+    setJwtEnv(SECRET_A, '3600');
+    const key = new TextEncoder().encode(SECRET_A);
+    const now = Math.floor(Date.now() / 1000);
+    const stringIatToken = await new SignJWT({ iat: 'not-a-number' } as unknown as JWTPayload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(USER_ID)
+      .setExpirationTime(now + 3600)
+      .sign(key);
+    await expect(verifyAccessToken(stringIatToken)).rejects.toBeInstanceOf(
+      JwtAccessTokenMalformedError
+    );
   });
 
   test('wrong secret fails verification with invalid signature error', async () => {

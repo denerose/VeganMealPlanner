@@ -181,14 +181,19 @@ function mapVerifyError(e: unknown): never {
   if (e instanceof errors.JWTInvalid || e instanceof errors.JWSInvalid) {
     throw new JwtAccessTokenMalformedError(e.message, { cause: e });
   }
+  // jose validates claim types itself (e.g. non-numeric `iat`); those are malformed tokens too.
+  if (e instanceof errors.JWTClaimValidationFailed) {
+    throw new JwtAccessTokenMalformedError(e.message, { cause: e });
+  }
   throw e;
 }
 
 /**
- * Verifies an HS256 access JWT and returns `sub`.
+ * Verifies an HS256 access JWT and returns `sub` plus the numeric `iat` (seconds since epoch).
  * Wrong signature, wrong alg, expired, or malformed tokens throw distinguishable errors for HTTP mapping.
+ * Tokens without a numeric `iat` are rejected as malformed (every token we sign carries `iat`).
  */
-export async function verifyAccessToken(token: string): Promise<{ sub: string }> {
+export async function verifyAccessToken(token: string): Promise<{ sub: string; iat: number }> {
   const secretKey = requireSecret();
   if (!token.trim()) {
     throw new JwtAccessTokenMalformedError('Token is empty');
@@ -199,7 +204,11 @@ export async function verifyAccessToken(token: string): Promise<{ sub: string }>
     if (typeof sub !== 'string' || !sub.trim()) {
       throw new JwtAccessTokenMalformedError('Access token missing sub claim');
     }
-    return { sub };
+    const iat = payload.iat;
+    if (typeof iat !== 'number' || !Number.isFinite(iat)) {
+      throw new JwtAccessTokenMalformedError('Access token missing iat claim');
+    }
+    return { sub, iat };
   } catch (e) {
     mapVerifyError(e);
   }
