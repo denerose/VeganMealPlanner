@@ -614,6 +614,7 @@ paths:
           application/json:
             schema:
               type: array
+              maxItems: 93
               items:
                 $ref: '#/components/schemas/DayPlanCreate'
       responses:

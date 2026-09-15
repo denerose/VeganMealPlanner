@@ -12,6 +12,9 @@ import { asObject, optionalNullableString, type JsonBody } from '../validate';
 
 const DATE_MESSAGE = 'date must be YYYY-MM-DD';
 
+/** Mirrors the 93-day cap on the day-plan list range. */
+export const DAY_PLAN_BULK_MAX_ITEMS = 93;
+
 function isValidYmd(value: string): boolean {
   try {
     planDateFromYmd(value);
@@ -53,6 +56,13 @@ export function parseDayPlanUpdate(body: unknown): DayPlanUpdateDto {
 export function parseDayPlanBulk(body: unknown): DayPlanCreateDto[] {
   if (!Array.isArray(body)) {
     throw new ApiProblem(422, 'invalid_body', 'Body must be a JSON array');
+  }
+  if (body.length > DAY_PLAN_BULK_MAX_ITEMS) {
+    throw new ApiProblem(
+      422,
+      'invalid_body',
+      `Bulk requests are limited to ${DAY_PLAN_BULK_MAX_ITEMS} items`
+    );
   }
   return body.map((item) => {
     if (item === null || typeof item !== 'object' || Array.isArray(item)) {
