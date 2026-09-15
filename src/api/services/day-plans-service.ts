@@ -6,6 +6,70 @@ import { readJsonBody, parseDayPlanRange } from '../parse';
 import { ApiProblem } from '../api-problem';
 import type { DayPlanCreateDto, DayPlanUpdateDto } from '../../domain/dtos/day-plan';
 import { rethrowPrisma } from './prisma-map';
+import { requireScoped } from './require-scoped';
+import { toMealId } from '../../domain/types/ids';
+import { asObject, optionalNullableString, type JsonBody } from '../validate';
+
+const DATE_MESSAGE = 'date must be YYYY-MM-DD';
+
+function isValidYmd(value: string): boolean {
+  try {
+    planDateFromYmd(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function parseMealIdField(o: JsonBody, field: string) {
+  const v = optionalNullableString(o, field);
+  return v === undefined || v === null ? v : toMealId(v);
+}
+
+/** Validates day-plan create JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseDayPlanCreate(body: unknown): DayPlanCreateDto {
+  const o = asObject(body);
+  const date = o.date;
+  if (typeof date !== 'string' || !isValidYmd(date)) {
+    throw new ApiProblem(422, 'invalid_body', DATE_MESSAGE);
+  }
+  return {
+    date,
+    lunchMealId: parseMealIdField(o, 'lunchMealId'),
+    dinnerMealId: parseMealIdField(o, 'dinnerMealId'),
+  };
+}
+
+/** Validates day-plan update JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseDayPlanUpdate(body: unknown): DayPlanUpdateDto {
+  const o = asObject(body);
+  return {
+    lunchMealId: parseMealIdField(o, 'lunchMealId'),
+    dinnerMealId: parseMealIdField(o, 'dinnerMealId'),
+  };
+}
+
+/** Validates day-plan bulk JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseDayPlanBulk(body: unknown): DayPlanCreateDto[] {
+  if (!Array.isArray(body)) {
+    throw new ApiProblem(422, 'invalid_body', 'Body must be a JSON array');
+  }
+  return body.map((item) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+      throw new ApiProblem(422, 'invalid_body', 'each item must be a JSON object');
+    }
+    const o = item as JsonBody;
+    const date = o.date;
+    if (typeof date !== 'string' || !isValidYmd(date)) {
+      throw new ApiProblem(422, 'invalid_body', `Invalid date: ${date}`);
+    }
+    return {
+      date,
+      lunchMealId: parseMealIdField(o, 'lunchMealId'),
+      dinnerMealId: parseMealIdField(o, 'dinnerMealId'),
+    };
+  });
+}
 
 async function assertMealsOptional(
   prisma: PrismaClient,
@@ -36,12 +100,7 @@ export async function listDayPlans(url: URL, ctx: ApiContext): Promise<Response>
 }
 
 export async function createDayPlan(req: Request, ctx: ApiContext): Promise<Response> {
-  const dto = await readJsonBody<DayPlanCreateDto>(req);
-  try {
-    planDateFromYmd(dto.date);
-  } catch {
-    throw new ApiProblem(422, 'invalid_body', 'date must be YYYY-MM-DD');
-  }
+  const dto = parseDayPlanCreate(await readJsonBody<unknown>(req));
   await assertMealsOptional(ctx.prisma, ctx.householdId, dto.lunchMealId, dto.dinnerMealId);
   try {
     const row = await ctx.prisma.dayPlan.create({
@@ -62,18 +121,10 @@ export async function createDayPlan(req: Request, ctx: ApiContext): Promise<Resp
 }
 
 export async function bulkUpsertDayPlans(req: Request, ctx: ApiContext): Promise<Response> {
-  const body = await readJsonBody<DayPlanCreateDto[]>(req);
-  if (!Array.isArray(body)) {
-    throw new ApiProblem(422, 'invalid_body', 'Body must be a JSON array');
-  }
+  const body = parseDayPlanBulk(await readJsonBody<unknown>(req));
   const mealIds = new Set<string>();
   const seenDates = new Set<string>();
   for (const item of body) {
-    try {
-      planDateFromYmd(item.date);
-    } catch {
-      throw new ApiProblem(422, 'invalid_body', `Invalid date: ${item.date}`);
-    }
     if (seenDates.has(item.date)) {
       throw new ApiProblem(422, 'invalid_body', 'Duplicate date in bulk request');
     }
@@ -127,19 +178,21 @@ export async function bulkUpsertDayPlans(req: Request, ctx: ApiContext): Promise
 }
 
 export async function getDayPlan(id: string, ctx: ApiContext): Promise<Response> {
-  const row = await ctx.prisma.dayPlan.findFirst({
-    where: { id, householdId: ctx.householdId },
-  });
-  if (!row) throw new ApiProblem(404, 'not_found', 'Day plan not found');
+  const row = await requireScoped('Day plan', () =>
+    ctx.prisma.dayPlan.findFirst({
+      where: { id, householdId: ctx.householdId },
+    })
+  );
   return Response.json(toDayPlanResponseDto(row));
 }
 
 export async function patchDayPlan(id: string, req: Request, ctx: ApiContext): Promise<Response> {
-  const dto = await readJsonBody<DayPlanUpdateDto>(req);
-  const existing = await ctx.prisma.dayPlan.findFirst({
-    where: { id, householdId: ctx.householdId },
-  });
-  if (!existing) throw new ApiProblem(404, 'not_found', 'Day plan not found');
+  const dto = parseDayPlanUpdate(await readJsonBody<unknown>(req));
+  await requireScoped('Day plan', () =>
+    ctx.prisma.dayPlan.findFirst({
+      where: { id, householdId: ctx.householdId },
+    })
+  );
   await assertMealsOptional(ctx.prisma, ctx.householdId, dto.lunchMealId, dto.dinnerMealId);
   const row = await ctx.prisma.dayPlan.update({
     where: { id },
@@ -152,10 +205,11 @@ export async function patchDayPlan(id: string, req: Request, ctx: ApiContext): P
 }
 
 export async function deleteDayPlan(id: string, ctx: ApiContext): Promise<Response> {
-  const existing = await ctx.prisma.dayPlan.findFirst({
-    where: { id, householdId: ctx.householdId },
-  });
-  if (!existing) throw new ApiProblem(404, 'not_found', 'Day plan not found');
+  await requireScoped('Day plan', () =>
+    ctx.prisma.dayPlan.findFirst({
+      where: { id, householdId: ctx.householdId },
+    })
+  );
   await ctx.prisma.dayPlan.delete({ where: { id } });
   return new Response(null, { status: 204 });
 }

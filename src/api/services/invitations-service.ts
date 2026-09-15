@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { normalizeEmail } from '../../domain/lib/normalize-email';
 import type { ApiContext } from '../handlers/me-household';
 import { ApiProblem } from '../api-problem';
+import { asObject } from '../validate';
 import { hashInviteTokenPlaintext } from '../lib/invite-token-hash';
 
 export const DEFAULT_INVITE_EXPIRES_HOURS = 168;
@@ -16,18 +17,11 @@ function isPlausibleEmail(email: string): boolean {
   return email.slice(at + 1).includes('.');
 }
 
-function requireObject(body: unknown): Record<string, unknown> {
-  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    throw new ApiProblem(422, 'invalid_body', 'Request body must be a JSON object');
-  }
-  return body as Record<string, unknown>;
-}
-
 export function parseCreateInvitationBody(body: unknown): {
   email: string;
   expiresInHours: number;
 } {
-  const o = requireObject(body);
+  const o = asObject(body);
   const emailRaw = o.email;
   if (typeof emailRaw !== 'string') {
     throw new ApiProblem(422, 'validation_error', 'email is required');

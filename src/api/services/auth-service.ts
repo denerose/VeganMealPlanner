@@ -4,6 +4,7 @@ import type { AuthTokenEnvelopeDto } from '../../domain/dtos/auth';
 import { toUserId } from '../../domain/types/ids';
 import { normalizeEmail } from '../../domain/lib/normalize-email';
 import { ApiProblem } from '../api-problem';
+import { asObject } from '../validate';
 import { hashInviteTokenPlaintext } from '../lib/invite-token-hash';
 import { hashPassword, verifyPassword } from '../password';
 import { signAccessToken } from '../jwt-access';
@@ -45,19 +46,12 @@ function timingSafeEqualUtf8(a: string, b: string): boolean {
   return timingSafeEqual(ba, bb);
 }
 
-function requireObject(body: unknown): Record<string, unknown> {
-  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    throw new ApiProblem(422, 'invalid_body', 'Request body must be a JSON object');
-  }
-  return body as Record<string, unknown>;
-}
-
 /**
  * Validates register JSON and returns either create-household or join-via-invite input.
  * @throws ApiProblem for 422-class validation errors.
  */
 export function parseRegistrationBody(body: unknown): ParsedRegistrationInput {
-  const o = requireObject(body);
+  const o = asObject(body);
   const emailRaw = o.email;
   const passwordRaw = o.password;
   if (typeof emailRaw !== 'string' || typeof passwordRaw !== 'string') {
@@ -133,7 +127,7 @@ export function parseRegistrationBody(body: unknown): ParsedRegistrationInput {
 }
 
 export function parseLoginBody(body: unknown): { email: string; password: string } {
-  const o = requireObject(body);
+  const o = asObject(body);
   const emailRaw = o.email;
   const passwordRaw = o.password;
   if (typeof emailRaw !== 'string' || typeof passwordRaw !== 'string') {

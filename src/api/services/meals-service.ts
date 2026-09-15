@@ -9,11 +9,99 @@ import {
 } from '../parse';
 import { ApiProblem } from '../api-problem';
 import { rethrowPrisma } from './prisma-map';
+import { requireScoped } from './require-scoped';
 import { isUuid } from '../uuid';
-import type { MealCreateDto, MealUpdateDto } from '../../domain/dtos/meal';
+import type { MealCreateDto, MealQualitiesDto, MealUpdateDto } from '../../domain/dtos/meal';
 import { readJsonBody } from '../parse';
 import { previousPlanYmd, nextPlanYmd } from '../../domain/lib/adjacent-plan-dates';
 import { planDateFromYmd } from '../../domain/lib/plan-date';
+import { toIngredientId, toUserId, type IngredientId } from '../../domain/types/ids';
+import {
+  asObject,
+  optionalNullableString,
+  optionalString,
+  optionalStringArray,
+  requiredString,
+  type JsonBody,
+} from '../validate';
+
+const HERO_SPECS_MESSAGE =
+  'heroIngredientIds must be an array of { ingredientId, sortOrder? } objects';
+
+function parseHeroSpecs(v: unknown): { ingredientId: IngredientId; sortOrder?: number }[] {
+  if (!Array.isArray(v)) {
+    throw new ApiProblem(422, 'invalid_body', HERO_SPECS_MESSAGE);
+  }
+  return v.map((h) => {
+    if (h === null || typeof h !== 'object' || Array.isArray(h)) {
+      throw new ApiProblem(422, 'invalid_body', HERO_SPECS_MESSAGE);
+    }
+    const o = h as JsonBody;
+    const ingredientId = o.ingredientId;
+    const sortOrder = o.sortOrder;
+    if (
+      typeof ingredientId !== 'string' ||
+      (sortOrder !== undefined && typeof sortOrder !== 'number')
+    ) {
+      throw new ApiProblem(422, 'invalid_body', HERO_SPECS_MESSAGE);
+    }
+    return sortOrder === undefined
+      ? { ingredientId: toIngredientId(ingredientId) }
+      : { ingredientId: toIngredientId(ingredientId), sortOrder };
+  });
+}
+
+function parseQualities(v: unknown): Partial<MealQualitiesDto> | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) {
+    throw new ApiProblem(422, 'invalid_body', 'qualities must be an object');
+  }
+  const o = v as JsonBody;
+  const flag = (name: keyof MealQualitiesDto): boolean | undefined => {
+    const raw = o[name];
+    if (raw === undefined) return undefined;
+    if (typeof raw !== 'boolean') {
+      throw new ApiProblem(422, 'invalid_body', `qualities.${name} must be a boolean`);
+    }
+    return raw;
+  };
+  return {
+    makesLeftovers: flag('makesLeftovers'),
+    isGreasy: flag('isGreasy'),
+    isCreamy: flag('isCreamy'),
+    isAcidic: flag('isAcidic'),
+  };
+}
+
+/** Validates meal create JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseMealCreate(body: unknown): MealCreateDto {
+  const o = asObject(body);
+  return {
+    name: requiredString(o, 'name'),
+    description: optionalString(o, 'description'),
+    recipeUrl: optionalNullableString(o, 'recipeUrl'),
+    imageId: optionalNullableString(o, 'imageId'),
+    qualities: parseQualities(o.qualities),
+    heroIngredientIds:
+      o.heroIngredientIds === undefined ? undefined : parseHeroSpecs(o.heroIngredientIds),
+    cookedByUserIds: optionalStringArray(o, 'cookedByUserIds')?.map(toUserId),
+  };
+}
+
+/** Validates meal update JSON; @throws ApiProblem(422) on bad bodies. */
+export function parseMealUpdate(body: unknown): MealUpdateDto {
+  const o = asObject(body);
+  return {
+    name: optionalString(o, 'name'),
+    description: optionalString(o, 'description'),
+    recipeUrl: optionalNullableString(o, 'recipeUrl'),
+    imageId: optionalNullableString(o, 'imageId'),
+    qualities: parseQualities(o.qualities),
+    heroIngredientIds:
+      o.heroIngredientIds === undefined ? undefined : parseHeroSpecs(o.heroIngredientIds),
+    cookedByUserIds: optionalStringArray(o, 'cookedByUserIds')?.map(toUserId),
+  };
+}
 
 function toMealMapperRow(m: {
   id: string;
@@ -165,10 +253,7 @@ export async function getMeal(mealId: string, ctx: ApiContext): Promise<Response
 }
 
 export async function createMeal(req: Request, ctx: ApiContext): Promise<Response> {
-  const dto = await readJsonBody<MealCreateDto>(req);
-  if (!dto.name?.trim()) {
-    throw new ApiProblem(422, 'invalid_body', 'name is required');
-  }
+  const dto = parseMealCreate(await readJsonBody<unknown>(req));
   const heroSpecs = dto.heroIngredientIds ?? [];
   const cooked = dto.cookedByUserIds ?? [];
   await assertIngredientsInHousehold(
@@ -225,13 +310,12 @@ export async function createMeal(req: Request, ctx: ApiContext): Promise<Respons
 }
 
 export async function updateMeal(mealId: string, req: Request, ctx: ApiContext): Promise<Response> {
-  const dto = await readJsonBody<MealUpdateDto>(req);
-  const existing = await ctx.prisma.meal.findFirst({
-    where: { id: mealId, householdId: ctx.householdId },
-  });
-  if (!existing) {
-    throw new ApiProblem(404, 'not_found', 'Meal not found');
-  }
+  const dto = parseMealUpdate(await readJsonBody<unknown>(req));
+  await requireScoped('Meal', () =>
+    ctx.prisma.meal.findFirst({
+      where: { id: mealId, householdId: ctx.householdId },
+    })
+  );
   if (dto.cookedByUserIds) {
     await assertUsersInHousehold(ctx.prisma, ctx.householdId, dto.cookedByUserIds);
   }
@@ -292,12 +376,11 @@ export async function updateMeal(mealId: string, req: Request, ctx: ApiContext):
 }
 
 export async function deleteMeal(mealId: string, ctx: ApiContext): Promise<Response> {
-  const existing = await ctx.prisma.meal.findFirst({
-    where: { id: mealId, householdId: ctx.householdId },
-  });
-  if (!existing) {
-    throw new ApiProblem(404, 'not_found', 'Meal not found');
-  }
+  await requireScoped('Meal', () =>
+    ctx.prisma.meal.findFirst({
+      where: { id: mealId, householdId: ctx.householdId },
+    })
+  );
   try {
     await ctx.prisma.meal.delete({ where: { id: mealId } });
     return new Response(null, { status: 204 });
