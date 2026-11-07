@@ -11,9 +11,9 @@ This project uses [Bun](https://bun.sh) as the runtime.
 
 Run `./scripts/check.sh` (or `bun run check`) to run format check, lint, typecheck, and **unit** tests together.
 
-**Destructive check with integration tests:** `./scripts/check-destructive.sh` (or `bun run check-destructive`) runs the same as `check` plus integration tests (Postgres required) and **changes local DB state**. Run it only deliberately — when integration tests were **changed** or **unit tests alone cannot fully cover** the work; otherwise use `check` for a faster, DB-free loop.
+**Integration checks (hermetic):** `./scripts/check-integration.sh` (or `bun run check-integration`) provisions a disposable `veganmealplanner_test` database, applies migrations, and runs the integration suite against it — your dev database is never touched. Use it whenever DB-backed verification is needed.
 
-**Tests:** `bun run test` / `bun run test:unit` runs `tests/unit` only (fast). `bun run test:integration` runs `tests/integration` and needs Postgres with migrations applied. `bun run test:all` runs both—use before merge.
+**Tests:** `bun run test` / `bun run test:unit` runs `tests/unit` only (fast). `bun run test:integration` runs `tests/integration` and needs Postgres with migrations applied — prefer `check-integration`, which targets a disposable database. `bun run test:all` runs both—use before merge.
 
 ## API / Backend
 
@@ -36,7 +36,7 @@ Protected routes expect **`Authorization: Bearer <JWT>`** with a `sub` claim (us
 
 **Password hashing:** User passwords are stored with **Argon2id** using explicit cost parameters in code (not environment variables) so every environment hashes consistently: **19 MiB** memory (`memoryCost` 19456 KiB), **2** time passes, **parallelism 1**, matching the [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) minimum recommendation for deployments with less than 64 GiB RAM. See `src/api/password.ts` (`ARGON2_PASSWORD_OPTIONS`).
 
-The published HTTP contract is **`contracts/openapi.yaml`** (OpenAPI 3). Unit tests validate this spec (`tests/unit/contracts/openapi.test.ts`); run `bun run test:unit` or `./scripts/check.sh` after changing the API or the contract. Use `./scripts/check-destructive.sh` / `bun run check-destructive` only deliberately if you also need integration coverage for that change — it changes local DB state (see **Destructive check with integration tests** above).
+The published HTTP contract is **`contracts/openapi.yaml`** (OpenAPI 3). Unit tests validate this spec (`tests/unit/contracts/openapi.test.ts`); run `bun run test:unit` or `./scripts/check.sh` after changing the API or the contract. Use `./scripts/check-integration.sh` / `bun run check-integration` when you also need integration coverage for that change (see **Integration checks (hermetic)** above).
 
 ## CLI
 
