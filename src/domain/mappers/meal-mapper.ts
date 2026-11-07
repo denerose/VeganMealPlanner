@@ -1,5 +1,5 @@
 import type { IngredientStorageType } from '../types/enums';
-import type { MealResponseDto } from '../dtos/meal';
+import type { MealLeftoverSourceDto, MealResponseDto } from '../dtos/meal';
 import { toHouseholdId, toIngredientId, toMealId, toUserId } from '../types/ids';
 
 export interface MealMapperMealRow {
@@ -19,6 +19,8 @@ export interface MealMapperMealRow {
 
 export interface MealMapperHeroRow {
   sortOrder: number;
+  optional: boolean;
+  substitutionGroup: string | null;
   ingredient: {
     id: string;
     name: string;
@@ -27,14 +29,20 @@ export interface MealMapperHeroRow {
   };
 }
 
+export interface MealMapperLeftoverSourceRow {
+  mealId: string;
+  name: string;
+}
+
 export interface MealMapperInput {
   meal: MealMapperMealRow;
   heroRows: MealMapperHeroRow[];
   cookedByUserIds: string[];
+  leftoverSourceRows: MealMapperLeftoverSourceRow[];
 }
 
 export function toMealResponseDto(input: MealMapperInput): MealResponseDto {
-  const { meal, heroRows, cookedByUserIds } = input;
+  const { meal, heroRows, cookedByUserIds, leftoverSourceRows } = input;
   const sortedHeroes = [...heroRows].sort((a, b) => a.sortOrder - b.sortOrder);
   return {
     id: toMealId(meal.id),
@@ -55,8 +63,16 @@ export function toMealResponseDto(input: MealMapperInput): MealResponseDto {
       storageType: row.ingredient.storageType,
       perishable: row.ingredient.perishable,
       sortOrder: row.sortOrder,
+      optional: row.optional,
+      substitutionGroup: row.substitutionGroup,
     })),
     cookedBy: cookedByUserIds.map(toUserId),
+    leftoverSources: leftoverSourceRows.map(
+      (row): MealLeftoverSourceDto => ({
+        mealId: toMealId(row.mealId),
+        name: row.name,
+      })
+    ),
     createdAt: meal.createdAt.toISOString(),
     updatedAt: meal.updatedAt.toISOString(),
   };

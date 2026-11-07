@@ -124,6 +124,8 @@ New qualities in the future = **new boolean columns** + migration (explicit trad
 
 - `mealId` (FK → `Meal`), `ingredientId` (FK → `Ingredient`)
 - `sortOrder` (small integer) for menu-style ordering
+- `optional` (boolean, default `false`) — `false` = required, `true` = skippable garnish or skippable group member
+- `substitutionGroup` (nullable text label) — items sharing a label within a meal are interchangeable substitutes; `NULL` = ungrouped. Labels are trimmed, non-empty, ≤64 chars. **Planner-side rule:** a group is required iff any member has `optional = false`; an all-optional group can be skipped entirely. Groups are labels, not entities — no write-time group invariants.
 - Unique `(mealId, ingredientId)`
 
 ### `MealCookedBy` (junction)
@@ -131,6 +133,12 @@ New qualities in the future = **new boolean columns** + migration (explicit trad
 - `mealId` (FK → `Meal`), `userId` (FK → `User`)
 - Unique `(mealId, userId)`
 - **Invariant (application layer):** `userId` must be a member of the meal’s household (`HouseholdMembership`). Same-household checks for meal ↔ day plan links are also enforced in the service layer (Postgres does not express cross-row household equality trivially without triggers).
+
+### `MealLeftoverSource` (junction)
+
+- `consumerMealId` (FK → `Meal`, cascade on consumer delete), `sourceMealId` (FK → `Meal`, restrict — deleting a meal others consume is blocked with `409 leftover_source_in_use`)
+- Unique `(consumerMealId, sourceMealId)`
+- **Invariants (application layer, enforced at write time):** both meals belong to the same household; `sourceMealId` must reference a meal with `makesLeftovers = true`; self-reference is rejected. Write-time only — later quality edits do not cascade. Transitive cycles are allowed (relations are declarative; planner UIs interpret them). "Either of N sources satisfies" = N rows.
 
 ### `DayPlan`
 

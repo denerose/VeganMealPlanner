@@ -14,6 +14,13 @@ export interface MealHeroIngredientDto {
   storageType: IngredientStorageType;
   perishable: boolean;
   sortOrder: number;
+  optional: boolean;
+  substitutionGroup: string | null;
+}
+
+export interface MealLeftoverSourceDto {
+  mealId: MealId;
+  name: string;
 }
 
 export interface MealResponseDto {
@@ -26,8 +33,16 @@ export interface MealResponseDto {
   qualities: MealQualitiesDto;
   heroIngredients: MealHeroIngredientDto[];
   cookedBy: UserId[];
+  leftoverSources: MealLeftoverSourceDto[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MealHeroSpecDto {
+  ingredientId: IngredientId;
+  sortOrder?: number;
+  optional?: boolean;
+  substitutionGroup?: string | null;
 }
 
 export interface MealCreateDto {
@@ -36,13 +51,14 @@ export interface MealCreateDto {
   recipeUrl?: string | null;
   imageId?: string | null;
   qualities?: Partial<MealQualitiesDto>;
-  heroIngredientIds?: { ingredientId: IngredientId; sortOrder?: number }[];
+  heroIngredientIds?: MealHeroSpecDto[];
   cookedByUserIds?: UserId[];
+  leftoverSourceMealIds?: MealId[];
 }
 
 export type MealUpdateDto = Partial<
   Omit<MealCreateDto, 'heroIngredientIds' | 'cookedByUserIds'>
 > & {
-  heroIngredientIds?: { ingredientId: IngredientId; sortOrder?: number }[];
+  heroIngredientIds?: MealHeroSpecDto[];
   cookedByUserIds?: UserId[];
 };

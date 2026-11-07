@@ -273,4 +273,173 @@ describe('Meals API (integration)', () => {
     const patchBody = (await patchRes.json()) as { name: string };
     expect(patchBody.name).toBe('After patch');
   });
+
+  test('POST /api/meals round-trips optional/grouped heroes and leftover sources', async () => {
+    const { userId, householdId } = seeded!;
+    const ing = await prisma.ingredient.create({
+      data: {
+        householdId,
+        name: 'stuffing mix',
+        storageType: 'PANTRY',
+      } as never,
+    });
+    const soup = await prisma.meal.create({
+      data: { householdId, name: 'Veggie Soup', description: '', makesLeftovers: true },
+    });
+
+    const res = await handler(
+      new Request('http://localhost/api/meals', {
+        method: 'POST',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Soupy Sausage Rolls',
+          heroIngredientIds: [
+            { ingredientId: ing.id, optional: true, substitutionGroup: 'binder' },
+          ],
+          leftoverSourceMealIds: [soup.id],
+        }),
+      })
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      id: string;
+      heroIngredients: {
+        ingredientId: string;
+        optional: boolean;
+        substitutionGroup: string | null;
+      }[];
+      leftoverSources: { mealId: string; name: string }[];
+    };
+    expect(body.heroIngredients).toHaveLength(1);
+    expect(body.heroIngredients[0]).toMatchObject({
+      ingredientId: ing.id,
+      optional: true,
+      substitutionGroup: 'binder',
+    });
+    expect(body.leftoverSources).toEqual([{ mealId: soup.id, name: 'Veggie Soup' }]);
+
+    const getRes = await handler(
+      new Request(`http://localhost/api/meals/${body.id}`, {
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    const getBody = (await getRes.json()) as typeof body;
+    expect(getBody.leftoverSources).toEqual([{ mealId: soup.id, name: 'Veggie Soup' }]);
+    expect(getBody.heroIngredients[0]).toMatchObject({
+      optional: true,
+      substitutionGroup: 'binder',
+    });
+  });
+
+  test('POST /api/meals rejects source meal without makesLeftovers', async () => {
+    const { userId, householdId } = seeded!;
+    const notLeftover = await prisma.meal.create({
+      data: { householdId, name: 'Fresh Salad', description: '', makesLeftovers: false },
+    });
+    const res = await handler(
+      new Request('http://localhost/api/meals', {
+        method: 'POST',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'X', leftoverSourceMealIds: [notLeftover.id] }),
+      })
+    );
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe('invalid_leftover_source');
+  });
+
+  test('POST /api/meals rejects cross-household source meal', async () => {
+    const { userId } = seeded!;
+    const other = await prisma.household.create({ data: { name: 'Other House' } });
+    try {
+      const foreign = await prisma.meal.create({
+        data: {
+          householdId: other.id,
+          name: 'Foreign Soup',
+          description: '',
+          makesLeftovers: true,
+        },
+      });
+      const res = await handler(
+        new Request('http://localhost/api/meals', {
+          method: 'POST',
+          headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'X', leftoverSourceMealIds: [foreign.id] }),
+        })
+      );
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('invalid_leftover_source');
+    } finally {
+      await prisma.meal.deleteMany({ where: { householdId: other.id } });
+      await prisma.household.delete({ where: { id: other.id } });
+    }
+  });
+
+  test('PATCH /api/meals/{id} replaces leftover sources and rejects self-reference', async () => {
+    const { userId, householdId } = seeded!;
+    const meal = await prisma.meal.create({
+      data: { householdId, name: 'Consumer', description: '' },
+    });
+    const soup = await prisma.meal.create({
+      data: { householdId, name: 'Lentil Soup', description: '', makesLeftovers: true },
+    });
+
+    const selfRes = await handler(
+      new Request(`http://localhost/api/meals/${meal.id}`, {
+        method: 'PATCH',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leftoverSourceMealIds: [meal.id] }),
+      })
+    );
+    expect(selfRes.status).toBe(422);
+    expect(((await selfRes.json()) as { code: string }).code).toBe('invalid_leftover_source');
+
+    const okRes = await handler(
+      new Request(`http://localhost/api/meals/${meal.id}`, {
+        method: 'PATCH',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leftoverSourceMealIds: [soup.id] }),
+      })
+    );
+    expect(okRes.status).toBe(200);
+    expect(((await okRes.json()) as { leftoverSources: unknown[] }).leftoverSources).toEqual([
+      { mealId: soup.id, name: 'Lentil Soup' },
+    ]);
+
+    const clearRes = await handler(
+      new Request(`http://localhost/api/meals/${meal.id}`, {
+        method: 'PATCH',
+        headers: { 'X-Dev-User-Id': userId, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leftoverSourceMealIds: [] }),
+      })
+    );
+    expect(clearRes.status).toBe(200);
+    expect(((await clearRes.json()) as { leftoverSources: unknown[] }).leftoverSources).toEqual([]);
+  });
+
+  test('DELETE /api/meals returns 409 leftover_source_in_use when consumed by another meal', async () => {
+    const { userId, householdId } = seeded!;
+    const soup = await prisma.meal.create({
+      data: { householdId, name: 'Ref Soup', description: '', makesLeftovers: true },
+    });
+    await prisma.meal.create({
+      data: {
+        householdId,
+        name: 'Soup Eater',
+        description: '',
+        leftoverSourcesConsumed: { create: [{ sourceMealId: soup.id }] },
+      },
+    });
+
+    const res = await handler(
+      new Request(`http://localhost/api/meals/${soup.id}`, {
+        method: 'DELETE',
+        headers: { 'X-Dev-User-Id': userId },
+      })
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe('leftover_source_in_use');
+  });
 });

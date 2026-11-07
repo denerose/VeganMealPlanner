@@ -539,7 +539,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Meal referenced by a day plan
+          description: Meal referenced by a day plan or as a leftover source
           content:
             application/json:
               schema:
@@ -549,6 +549,10 @@ paths:
                   value:
                     code: meal_in_use
                     message: Meal is referenced by a day plan
+                leftover_source_in_use:
+                  value:
+                    code: leftover_source_in_use
+                    message: Meal is a leftover source for another meal
 
   /api/day-plans:
     get:
@@ -1123,6 +1127,8 @@ components:
         - storageType
         - perishable
         - sortOrder
+        - optional
+        - substitutionGroup
       properties:
         ingredientId:
           type: string
@@ -1135,6 +1141,32 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        optional:
+          type: boolean
+          description: |
+            FALSE = required. TRUE = skippable (garnish) or a skippable
+            substitute-group member (see substitutionGroup).
+        substitutionGroup:
+          type: string
+          nullable: true
+          description: |
+            Label; items sharing a label within a meal are interchangeable
+            substitutes. NULL = ungrouped. Planner-side rule: a group is
+            required iff any member has optional = false; otherwise the whole
+            group can be skipped.
+
+    MealLeftoverSource:
+      type: object
+      required:
+        - mealId
+        - name
+      properties:
+        mealId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Source meal name (planner UI convenience).
 
     Meal:
       type: object
@@ -1148,6 +1180,7 @@ components:
         - qualities
         - heroIngredients
         - cookedBy
+        - leftoverSources
         - createdAt
         - updatedAt
       properties:
@@ -1178,6 +1211,12 @@ components:
           items:
             type: string
             format: uuid
+        leftoverSources:
+          type: array
+          items:
+            $ref: '#/components/schemas/MealLeftoverSource'
+          description: Meals whose leftovers this meal consumes. A source must
+            have makesLeftovers = true at write time.
         createdAt:
           type: string
           format: date-time
@@ -1196,6 +1235,14 @@ components:
         sortOrder:
           type: integer
           default: 0
+        optional:
+          type: boolean
+          default: false
+        substitutionGroup:
+          type: string
+          nullable: true
+          maxLength: 64
+          description: Trimmed, non-empty when present; null = ungrouped.
 
     MealCreate:
       type: object
@@ -1232,6 +1279,15 @@ components:
           items:
             type: string
             format: uuid
+        leftoverSourceMealIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: |
+            Meals whose leftovers this meal consumes. Each must belong to the
+            household and have makesLeftovers = true; self-reference is
+            rejected. Full replace on PATCH.
 
     MealPatch:
       type: object
@@ -1262,6 +1318,11 @@ components:
           items:
             $ref: '#/components/schemas/HeroIngredientRef'
         cookedByUserIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        leftoverSourceMealIds:
           type: array
           items:
             type: string
