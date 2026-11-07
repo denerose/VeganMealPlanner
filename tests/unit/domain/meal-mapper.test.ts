@@ -23,6 +23,8 @@ describe('toMealResponseDto', () => {
       heroRows: [
         {
           sortOrder: 1,
+          optional: false,
+          substitutionGroup: null,
           ingredient: {
             id: 'i1',
             name: 'lentils',
@@ -32,6 +34,7 @@ describe('toMealResponseDto', () => {
         },
       ],
       cookedByUserIds: ['u1'],
+      leftoverSourceRows: [],
     });
 
     expect(dto.qualities).toEqual({
@@ -65,6 +68,8 @@ describe('toMealResponseDto', () => {
       heroRows: [
         {
           sortOrder: 2,
+          optional: false,
+          substitutionGroup: null,
           ingredient: {
             id: 'i2',
             name: 'second',
@@ -74,6 +79,8 @@ describe('toMealResponseDto', () => {
         },
         {
           sortOrder: 0,
+          optional: false,
+          substitutionGroup: null,
           ingredient: {
             id: 'i0',
             name: 'first',
@@ -83,11 +90,75 @@ describe('toMealResponseDto', () => {
         },
       ],
       cookedByUserIds: [],
+      leftoverSourceRows: [],
     });
 
     expect(dto.heroIngredients.map((h) => h.ingredientId)).toEqual([
       toIngredientId('i0'),
       toIngredientId('i2'),
+    ]);
+  });
+
+  test('maps hero optional/substitutionGroup and leftover sources', () => {
+    const dto = toMealResponseDto({
+      meal: {
+        id: 'm1',
+        householdId: 'h1',
+        name: 'Soupy Sausage Rolls',
+        description: '',
+        recipeUrl: null,
+        imageId: null,
+        makesLeftovers: true,
+        isGreasy: false,
+        isCreamy: false,
+        isAcidic: false,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      heroRows: [
+        {
+          sortOrder: 0,
+          optional: true,
+          substitutionGroup: 'binder',
+          ingredient: {
+            id: 'i1',
+            name: 'stuffing mix',
+            storageType: IngredientStorageType.PANTRY,
+            perishable: false,
+          },
+        },
+        {
+          sortOrder: 1,
+          optional: false,
+          substitutionGroup: null,
+          ingredient: {
+            id: 'i2',
+            name: 'puff pastry',
+            storageType: IngredientStorageType.FROZEN,
+            perishable: true,
+          },
+        },
+      ],
+      cookedByUserIds: [],
+      leftoverSourceRows: [
+        { mealId: 'm9', name: 'Veggie Soup' },
+        { mealId: 'm8', name: 'Lentil Soup' },
+      ],
+    });
+
+    expect(dto.heroIngredients[0]).toMatchObject({
+      ingredientId: toIngredientId('i1'),
+      optional: true,
+      substitutionGroup: 'binder',
+    });
+    expect(dto.heroIngredients[1]).toMatchObject({
+      ingredientId: toIngredientId('i2'),
+      optional: false,
+      substitutionGroup: null,
+    });
+    expect(dto.leftoverSources).toEqual([
+      { mealId: toMealId('m9'), name: 'Veggie Soup' },
+      { mealId: toMealId('m8'), name: 'Lentil Soup' },
     ]);
   });
 });

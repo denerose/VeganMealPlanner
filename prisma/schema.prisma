@@ -93,6 +93,8 @@ model Meal {
 
   heroIngredients MealHeroIngredient[]
   cookedBy        MealCookedBy[]
+  leftoverSourcesConsumed MealLeftoverSource[] @relation("MealLeftoverSourceConsumer")
+  leftoverSourcesSupplied MealLeftoverSource[] @relation("MealLeftoverSourceSource")
   dayPlansLunch   DayPlan[]            @relation("DayPlanLunchMeal")
   dayPlansDinner  DayPlan[]            @relation("DayPlanDinnerMeal")
 
@@ -118,7 +120,9 @@ model Ingredient {
 model MealHeroIngredient {
   mealId       String
   ingredientId String
-  sortOrder    Int    @default(0)
+  sortOrder    Int     @default(0)
+  optional     Boolean @default(false)
+  substitutionGroup String?
 
   meal       Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)
   ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
@@ -136,6 +140,17 @@ model MealCookedBy {
 
   @@id([mealId, userId])
   @@index([mealId])
+}
+
+model MealLeftoverSource {
+  consumerMealId String
+  sourceMealId   String
+
+  consumerMeal Meal @relation("MealLeftoverSourceConsumer", fields: [consumerMealId], references: [id], onDelete: Cascade)
+  sourceMeal   Meal @relation("MealLeftoverSourceSource", fields: [sourceMealId], references: [id], onDelete: Restrict)
+
+  @@id([consumerMealId, sourceMealId])
+  @@index([consumerMealId])
 }
 
 model DayPlan {

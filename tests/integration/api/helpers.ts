@@ -55,6 +55,9 @@ export async function teardownHouseholdMember(userId: string): Promise<void> {
 export async function resetHouseholdIntegrationData(householdId: string): Promise<void> {
   await prisma.householdInvitation.deleteMany({ where: { householdId } });
   await prisma.dayPlan.deleteMany({ where: { householdId } });
+  await prisma.mealLeftoverSource.deleteMany({
+    where: { OR: [{ consumerMeal: { householdId } }, { sourceMeal: { householdId } }] },
+  });
   await prisma.meal.deleteMany({ where: { householdId } });
   await prisma.ingredient.deleteMany({ where: { householdId } });
 }

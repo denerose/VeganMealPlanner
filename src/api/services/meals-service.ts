@@ -11,11 +11,16 @@ import { ApiProblem } from '../api-problem';
 import { rethrowPrisma } from './prisma-map';
 import { requireScoped } from './require-scoped';
 import { isUuid } from '../uuid';
-import type { MealCreateDto, MealQualitiesDto, MealUpdateDto } from '../../domain/dtos/meal';
+import type {
+  MealCreateDto,
+  MealHeroSpecDto,
+  MealQualitiesDto,
+  MealUpdateDto,
+} from '../../domain/dtos/meal';
 import { readJsonBody } from '../parse';
 import { previousPlanYmd, nextPlanYmd } from '../../domain/lib/adjacent-plan-dates';
 import { planDateFromYmd } from '../../domain/lib/plan-date';
-import { toIngredientId, toUserId, type IngredientId } from '../../domain/types/ids';
+import { toIngredientId, toMealId, toUserId } from '../../domain/types/ids';
 import {
   asObject,
   optionalNullableString,
@@ -26,9 +31,24 @@ import {
 } from '../validate';
 
 const HERO_SPECS_MESSAGE =
-  'heroIngredientIds must be an array of { ingredientId, sortOrder? } objects';
+  'heroIngredientIds must be an array of { ingredientId, sortOrder?, optional?, substitutionGroup? } objects';
+const SUBSTITUTION_GROUP_MESSAGE =
+  'substitutionGroup must be a non-empty string of at most 64 characters, or null';
 
-function parseHeroSpecs(v: unknown): { ingredientId: IngredientId; sortOrder?: number }[] {
+function parseSubstitutionGroup(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (typeof v !== 'string') {
+    throw new ApiProblem(422, 'invalid_body', SUBSTITUTION_GROUP_MESSAGE);
+  }
+  const trimmed = v.trim();
+  if (trimmed.length === 0 || trimmed.length > 64) {
+    throw new ApiProblem(422, 'invalid_body', SUBSTITUTION_GROUP_MESSAGE);
+  }
+  return trimmed;
+}
+
+function parseHeroSpecs(v: unknown): MealHeroSpecDto[] {
   if (!Array.isArray(v)) {
     throw new ApiProblem(422, 'invalid_body', HERO_SPECS_MESSAGE);
   }
@@ -39,15 +59,21 @@ function parseHeroSpecs(v: unknown): { ingredientId: IngredientId; sortOrder?: n
     const o = h as JsonBody;
     const ingredientId = o.ingredientId;
     const sortOrder = o.sortOrder;
+    const optional = o.optional;
     if (
       typeof ingredientId !== 'string' ||
-      (sortOrder !== undefined && typeof sortOrder !== 'number')
+      (sortOrder !== undefined && typeof sortOrder !== 'number') ||
+      (optional !== undefined && typeof optional !== 'boolean')
     ) {
       throw new ApiProblem(422, 'invalid_body', HERO_SPECS_MESSAGE);
     }
-    return sortOrder === undefined
-      ? { ingredientId: toIngredientId(ingredientId) }
-      : { ingredientId: toIngredientId(ingredientId), sortOrder };
+    const substitutionGroup = parseSubstitutionGroup(o.substitutionGroup);
+    return {
+      ingredientId: toIngredientId(ingredientId),
+      ...(sortOrder === undefined ? {} : { sortOrder }),
+      ...(optional === undefined ? {} : { optional }),
+      ...(substitutionGroup === undefined ? {} : { substitutionGroup }),
+    };
   });
 }
 
@@ -85,6 +111,7 @@ export function parseMealCreate(body: unknown): MealCreateDto {
     heroIngredientIds:
       o.heroIngredientIds === undefined ? undefined : parseHeroSpecs(o.heroIngredientIds),
     cookedByUserIds: optionalStringArray(o, 'cookedByUserIds')?.map(toUserId),
+    leftoverSourceMealIds: optionalStringArray(o, 'leftoverSourceMealIds')?.map(toMealId),
   };
 }
 
@@ -100,6 +127,7 @@ export function parseMealUpdate(body: unknown): MealUpdateDto {
     heroIngredientIds:
       o.heroIngredientIds === undefined ? undefined : parseHeroSpecs(o.heroIngredientIds),
     cookedByUserIds: optionalStringArray(o, 'cookedByUserIds')?.map(toUserId),
+    leftoverSourceMealIds: optionalStringArray(o, 'leftoverSourceMealIds')?.map(toMealId),
   };
 }
 
@@ -167,6 +195,33 @@ async function assertIngredientsInHousehold(
   }
 }
 
+async function assertLeftoverSourcesValid(
+  prisma: PrismaClient,
+  householdId: string,
+  consumerMealId: string | null,
+  sourceMealIds: string[]
+): Promise<void> {
+  if (sourceMealIds.length === 0) return;
+  if (consumerMealId !== null && sourceMealIds.includes(consumerMealId)) {
+    throw new ApiProblem(
+      422,
+      'invalid_leftover_source',
+      'A meal cannot be its own leftover source'
+    );
+  }
+  const unique = [...new Set(sourceMealIds)];
+  const n = await prisma.meal.count({
+    where: { householdId, makesLeftovers: true, id: { in: unique } },
+  });
+  if (n !== unique.length) {
+    throw new ApiProblem(
+      422,
+      'invalid_leftover_source',
+      'leftoverSourceMealIds must be leftover-making meals in the household'
+    );
+  }
+}
+
 async function loadMealBundle(prisma: PrismaClient, householdId: string, mealId: string) {
   const meal = await prisma.meal.findFirst({
     where: { id: mealId, householdId },
@@ -175,6 +230,7 @@ async function loadMealBundle(prisma: PrismaClient, householdId: string, mealId:
         include: { ingredient: true },
       },
       cookedBy: true,
+      leftoverSourcesConsumed: { include: { sourceMeal: { select: { id: true, name: true } } } },
     },
   });
   if (!meal) return null;
@@ -182,9 +238,15 @@ async function loadMealBundle(prisma: PrismaClient, householdId: string, mealId:
     meal,
     heroRows: meal.heroIngredients.map((h) => ({
       sortOrder: h.sortOrder,
+      optional: h.optional,
+      substitutionGroup: h.substitutionGroup,
       ingredient: h.ingredient,
     })),
     cookedByUserIds: meal.cookedBy.map((c) => c.userId),
+    leftoverSourceRows: meal.leftoverSourcesConsumed.map((row) => ({
+      mealId: row.sourceMeal.id,
+      name: row.sourceMeal.name,
+    })),
   };
 }
 
@@ -222,17 +284,24 @@ export async function listMeals(url: URL, ctx: ApiContext): Promise<Response> {
     include: {
       heroIngredients: { include: { ingredient: true } },
       cookedBy: true,
+      leftoverSourcesConsumed: { include: { sourceMeal: { select: { id: true, name: true } } } },
     },
   });
   const body = meals.map((m) => {
-    const { heroIngredients: hh, cookedBy: cb } = m;
+    const { heroIngredients: hh, cookedBy: cb, leftoverSourcesConsumed: ls } = m;
     return toMealResponseDto({
       meal: toMealMapperRow(m),
       heroRows: hh.map((h) => ({
         sortOrder: h.sortOrder,
+        optional: h.optional,
+        substitutionGroup: h.substitutionGroup,
         ingredient: h.ingredient,
       })),
       cookedByUserIds: cb.map((c) => c.userId),
+      leftoverSourceRows: ls.map((row) => ({
+        mealId: row.sourceMeal.id,
+        name: row.sourceMeal.name,
+      })),
     });
   });
   return Response.json(body);
@@ -248,6 +317,7 @@ export async function getMeal(mealId: string, ctx: ApiContext): Promise<Response
       meal: toMealMapperRow(bundle.meal),
       heroRows: bundle.heroRows,
       cookedByUserIds: bundle.cookedByUserIds,
+      leftoverSourceRows: bundle.leftoverSourceRows,
     })
   );
 }
@@ -262,6 +332,8 @@ export async function createMeal(req: Request, ctx: ApiContext): Promise<Respons
     heroSpecs.map((h) => h.ingredientId)
   );
   await assertUsersInHousehold(ctx.prisma, ctx.householdId, cooked);
+  const leftoverSources = dto.leftoverSourceMealIds ?? [];
+  await assertLeftoverSourcesValid(ctx.prisma, ctx.householdId, null, leftoverSources);
   const q = dto.qualities ?? {};
   try {
     const meal = await ctx.prisma.$transaction(async (tx) => {
@@ -284,12 +356,19 @@ export async function createMeal(req: Request, ctx: ApiContext): Promise<Respons
             mealId: m.id,
             ingredientId: h.ingredientId,
             sortOrder: h.sortOrder ?? 0,
+            optional: h.optional ?? false,
+            substitutionGroup: h.substitutionGroup ?? null,
           },
         });
       }
       for (const uid of cooked) {
         await tx.mealCookedBy.create({
           data: { mealId: m.id, userId: uid },
+        });
+      }
+      for (const sourceId of [...new Set(leftoverSources)]) {
+        await tx.mealLeftoverSource.create({
+          data: { consumerMealId: m.id, sourceMealId: sourceId },
         });
       }
       return m;
@@ -301,6 +380,7 @@ export async function createMeal(req: Request, ctx: ApiContext): Promise<Respons
         meal: toMealMapperRow(bundle.meal),
         heroRows: bundle.heroRows,
         cookedByUserIds: bundle.cookedByUserIds,
+        leftoverSourceRows: bundle.leftoverSourceRows,
       }),
       { status: 201 }
     );
@@ -324,6 +404,14 @@ export async function updateMeal(mealId: string, req: Request, ctx: ApiContext):
       ctx.prisma,
       ctx.householdId,
       dto.heroIngredientIds.map((h) => h.ingredientId)
+    );
+  }
+  if (dto.leftoverSourceMealIds) {
+    await assertLeftoverSourcesValid(
+      ctx.prisma,
+      ctx.householdId,
+      mealId,
+      dto.leftoverSourceMealIds
     );
   }
   const q = dto.qualities;
@@ -350,6 +438,8 @@ export async function updateMeal(mealId: string, req: Request, ctx: ApiContext):
               mealId,
               ingredientId: h.ingredientId,
               sortOrder: h.sortOrder ?? 0,
+              optional: h.optional ?? false,
+              substitutionGroup: h.substitutionGroup ?? null,
             },
           });
         }
@@ -360,6 +450,14 @@ export async function updateMeal(mealId: string, req: Request, ctx: ApiContext):
           await tx.mealCookedBy.create({ data: { mealId, userId: uid } });
         }
       }
+      if (dto.leftoverSourceMealIds) {
+        await tx.mealLeftoverSource.deleteMany({ where: { consumerMealId: mealId } });
+        for (const sourceId of [...new Set(dto.leftoverSourceMealIds)]) {
+          await tx.mealLeftoverSource.create({
+            data: { consumerMealId: mealId, sourceMealId: sourceId },
+          });
+        }
+      }
     });
     const bundle = await loadMealBundle(ctx.prisma, ctx.householdId, mealId);
     if (!bundle) throw new Error('meal missing after update');
@@ -368,6 +466,7 @@ export async function updateMeal(mealId: string, req: Request, ctx: ApiContext):
         meal: toMealMapperRow(bundle.meal),
         heroRows: bundle.heroRows,
         cookedByUserIds: bundle.cookedByUserIds,
+        leftoverSourceRows: bundle.leftoverSourceRows,
       })
     );
   } catch (e) {
@@ -381,6 +480,16 @@ export async function deleteMeal(mealId: string, ctx: ApiContext): Promise<Respo
       where: { id: mealId, householdId: ctx.householdId },
     })
   );
+  const supplied = await ctx.prisma.mealLeftoverSource.count({
+    where: { sourceMealId: mealId },
+  });
+  if (supplied > 0) {
+    throw new ApiProblem(
+      409,
+      'leftover_source_in_use',
+      'Meal is a leftover source for another meal'
+    );
+  }
   try {
     await ctx.prisma.meal.delete({ where: { id: mealId } });
     return new Response(null, { status: 204 });
