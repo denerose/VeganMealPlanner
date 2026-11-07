@@ -18,6 +18,15 @@ enum IngredientStorageType {
   FRESH
 }
 
+/// Meal leftover profile. ALWAYS = inherently over-produces (big pot, pan
+/// meal) so surplus needs a destination; OPTIONALLY = batch size is the
+/// cook's dial; NEVER = doesn't keep or travel.
+enum MealLeftovers {
+  ALWAYS
+  NEVER
+  OPTIONALLY
+}
+
 model Household {
   id        String   @id @default(uuid())
   name      String?
@@ -76,27 +85,28 @@ model HouseholdInvitation {
 }
 
 model Meal {
-  id             String   @id @default(uuid())
-  householdId    String
-  name           String
-  description    String   @default("")
-  recipeUrl      String?
-  imageId        String?
-  makesLeftovers Boolean  @default(false)
-  isGreasy       Boolean  @default(false)
-  isCreamy       Boolean  @default(false)
-  isAcidic       Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String        @id @default(uuid())
+  householdId  String
+  name         String
+  description  String        @default("")
+  recipeUrl    String?
+  imageId      String?
+  leftovers    MealLeftovers @default(OPTIONALLY)
+  isEasyToMake Boolean       @default(false)
+  isGreasy     Boolean       @default(false)
+  isCreamy     Boolean       @default(false)
+  isAcidic     Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
-  heroIngredients MealHeroIngredient[]
-  cookedBy        MealCookedBy[]
+  heroIngredients         MealHeroIngredient[]
+  cookedBy                MealCookedBy[]
   leftoverSourcesConsumed MealLeftoverSource[] @relation("MealLeftoverSourceConsumer")
   leftoverSourcesSupplied MealLeftoverSource[] @relation("MealLeftoverSourceSource")
-  dayPlansLunch   DayPlan[]            @relation("DayPlanLunchMeal")
-  dayPlansDinner  DayPlan[]            @relation("DayPlanDinnerMeal")
+  dayPlansLunch           DayPlan[]            @relation("DayPlanLunchMeal")
+  dayPlansDinner          DayPlan[]            @relation("DayPlanDinnerMeal")
 
   @@index([householdId])
 }
@@ -118,10 +128,10 @@ model Ingredient {
 }
 
 model MealHeroIngredient {
-  mealId       String
-  ingredientId String
-  sortOrder    Int     @default(0)
-  optional     Boolean @default(false)
+  mealId            String
+  ingredientId      String
+  sortOrder         Int     @default(0)
+  optional          Boolean @default(false)
   substitutionGroup String?
 
   meal       Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)

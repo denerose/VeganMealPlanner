@@ -356,7 +356,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/limit'
         - $ref: '#/components/parameters/offset'
-        - name: makesLeftovers
+        - name: leftovers
+          in: query
+          schema:
+            $ref: '#/components/schemas/MealLeftovers'
+          description: If present, constrain to that value; omit for no filter.
+        - name: isEasyToMake
           in: query
           schema:
             type: boolean
@@ -434,7 +439,12 @@ paths:
             format: date
             example: '2026-03-15'
           description: Calendar day YYYY-MM-DD
-        - name: makesLeftovers
+        - name: leftovers
+          in: query
+          schema:
+            $ref: '#/components/schemas/MealLeftovers'
+          description: Optional; same semantics as GET /api/meals list filters.
+        - name: isEasyToMake
           in: query
           schema:
             type: boolean
@@ -1102,16 +1112,34 @@ components:
         perishable:
           type: boolean
 
+    MealLeftovers:
+      type: string
+      description: |
+        Leftover profile. `always` = meal inherently over-produces ("makes a
+        big pot", lasagna pan); surplus needs a destination (next-day meal,
+        deliberate freeze). `never` = doesn't keep / doesn't travel; no queue
+        role. `optionally` = batch size is the cook's dial ("make double
+        sauce") when demand exists.
+      enum:
+        - always
+        - never
+        - optionally
+
     MealQualities:
       type: object
       required:
-        - makesLeftovers
+        - leftovers
+        - isEasyToMake
         - isGreasy
         - isCreamy
         - isAcidic
       properties:
-        makesLeftovers:
+        leftovers:
+          $ref: '#/components/schemas/MealLeftovers'
+        isEasyToMake:
           type: boolean
+          description: Easy for this household to make — effort is
+            recipe/tool-relative (e.g. risotto is easy in a Thermomix house).
         isGreasy:
           type: boolean
         isCreamy:
@@ -1216,7 +1244,7 @@ components:
           items:
             $ref: '#/components/schemas/MealLeftoverSource'
           description: Meals whose leftovers this meal consumes. A source must
-            have makesLeftovers = true at write time.
+            have leftovers != never at write time.
         createdAt:
           type: string
           format: date-time
@@ -1262,7 +1290,9 @@ components:
         qualities:
           type: object
           properties:
-            makesLeftovers:
+            leftovers:
+              $ref: '#/components/schemas/MealLeftovers'
+            isEasyToMake:
               type: boolean
             isGreasy:
               type: boolean
@@ -1286,7 +1316,7 @@ components:
             format: uuid
           description: |
             Meals whose leftovers this meal consumes. Each must belong to the
-            household and have makesLeftovers = true; self-reference is
+            household and have leftovers != never; self-reference is
             rejected. Full replace on PATCH.
 
     MealPatch:
@@ -1305,7 +1335,9 @@ components:
         qualities:
           type: object
           properties:
-            makesLeftovers:
+            leftovers:
+              $ref: '#/components/schemas/MealLeftovers'
+            isEasyToMake:
               type: boolean
             isGreasy:
               type: boolean

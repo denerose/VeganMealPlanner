@@ -235,7 +235,7 @@ vmp meals list
 vmp meals list --limit 10 --offset 20 --json
 ```
 
-Shows name, leftovers flag, truncated description, and last updated date.
+Shows name, leftovers value, truncated description, and last updated date.
 
 | Flag           | Description |
 | -------------- | ----------- |

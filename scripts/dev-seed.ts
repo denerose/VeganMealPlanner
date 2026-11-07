@@ -1,4 +1,4 @@
-import { IngredientStorageType } from '@prisma/client';
+import { IngredientStorageType, MealLeftovers } from '@prisma/client';
 import { prisma } from '../src/lib/prisma';
 import { hashPassword } from '../src/api/password';
 import { normalizeEmail } from '../src/domain/lib/normalize-email';
@@ -118,10 +118,14 @@ async function main() {
       householdId: DEV_HOUSEHOLD_ID,
       name: 'Coconut lentil curry',
       description: 'Weeknight vegan curry with tomatoes, spices, and coconut milk.',
+      leftovers: MealLeftovers.ALWAYS,
+      isEasyToMake: true,
     },
     update: {
       name: 'Coconut lentil curry',
       description: 'Weeknight vegan curry with tomatoes, spices, and coconut milk.',
+      leftovers: MealLeftovers.ALWAYS,
+      isEasyToMake: true,
     },
   });
 
@@ -132,10 +136,14 @@ async function main() {
       householdId: DEV_HOUSEHOLD_ID,
       name: 'Rainbow buddha bowl',
       description: 'Grain bowl with greens, roasted vegetables, and tahini lemon dressing.',
+      leftovers: MealLeftovers.OPTIONALLY,
+      isEasyToMake: true,
     },
     update: {
       name: 'Rainbow buddha bowl',
       description: 'Grain bowl with greens, roasted vegetables, and tahini lemon dressing.',
+      leftovers: MealLeftovers.OPTIONALLY,
+      isEasyToMake: true,
     },
   });
 
