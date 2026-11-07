@@ -10,12 +10,12 @@ This project uses **Bun** as the runtime.
 - **Run scripts:** `bun run <script>` (e.g. `bun run start`)
 - **Lint:** `bun run lint` — **Format:** `bun run format` / `bun run format:check`
 - **All checks (default):** `./scripts/check.sh` (or `bun run check`) runs format check, lint, typecheck, and **unit** tests only; failures are summarized to keep context clean—use this for routine verification.
-- **Checks including integration tests:** `./scripts/check-all.sh` (or `bun run check-all`) runs the same steps plus **`bun run test:integration`** (needs Postgres with migrations applied). **Use `check-all` only when** you have **updated integration tests** or the **current implementation cannot be fully validated by unit tests alone**—otherwise prefer `check` / `bun run check` to avoid unnecessary DB dependency and runtime.
+- **Destructive check (includes integration tests):** `./scripts/check-destructive.sh` (or `bun run check-destructive`) runs the same steps plus **`bun run test:integration`** (needs Postgres with migrations applied) and **changes DB state**. **Agents must not run it** — it exists for deliberate, human-run final verification only; prefer `check` / `bun run check` for routine verification.
 
 ### Final verification (API / auth / HTTP)
 
 - **`bun run check`** is the default routine loop; it does **not** run `test:integration`.
-- Treat **`bun run check-all`** (Postgres + migrations per [TESTING.md](TESTING.md)) as **final verification** before merge when you change HTTP handlers, auth or session behavior, or OpenAPI-backed routes in ways that need DB-backed validation; when you add or change tests under `tests/integration`; or when unit tests cannot exercise the code path you changed.
+- **`bun run check-destructive` changes DB state and must not be run by agents.** When you change HTTP handlers, auth or session behavior, OpenAPI-backed routes, or tests under `tests/integration`, finish on `check`, then say in your summary that DB-backed verification (Postgres + migrations per [TESTING.md](TESTING.md)) may be needed so the human can run it deliberately.
 - Purely static changes (comments, types without behavior) may stay on `check` only when that is appropriate.
 
 **API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo's `docker-compose.yml`. **Testing conventions and integration fixtures:** [TESTING.md](TESTING.md).
@@ -61,7 +61,7 @@ When you change HTTP routes, methods, status codes, or JSON response bodies unde
 
 **Routes live in one place:** add or change routes in the **`ROUTES` table in `src/api/router.ts`**. Dispatch, 405 `Allow` headers, and `tests/unit/api/router-contract.test.ts` (which asserts the table matches `contracts/openapi.yaml` exactly — paths and methods) all derive from that table. If you edit the contract or the table without the other, that test fails.
 
-Before finishing, run `bun test tests/unit/api/router-contract.test.ts tests/unit/contracts/openapi.test.ts`, or `bun run test:unit`, or `./scripts/check.sh` so OpenAPI validation still passes. Use `./scripts/check-all.sh` / `bun run check-all` **only** if you changed integration tests or need HTTP-level coverage that unit tests do not provide.
+Before finishing, run `bun test tests/unit/api/router-contract.test.ts tests/unit/contracts/openapi.test.ts`, or `bun run test:unit`, or `./scripts/check.sh` so OpenAPI validation still passes. Do **not** run `./scripts/check-destructive.sh` / `bun run check-destructive` — it changes DB state; flag it to the human instead if DB-backed coverage seems needed.
 
 ### Prisma migrations
 
