@@ -15,7 +15,7 @@ This project uses **Bun** as the runtime.
 ### Final verification (API / auth / HTTP)
 
 - **`bun run check`** is the default routine loop; it does **not** run `test:integration`.
-- **`bun run check-destructive` changes DB state and must not be run by agents.** When you change HTTP handlers, auth or session behavior, OpenAPI-backed routes, or tests under `tests/integration`, finish on `check`, then say in your summary that DB-backed verification (Postgres + migrations per [TESTING.md](TESTING.md)) may be needed so the human can run it deliberately.
+- Use **`bun run check-integration`** (hermetic test database; never the dev DB) whenever you change HTTP handlers, auth or session behavior, OpenAPI-backed routes, Prisma-backed paths, or tests under `tests/integration`. It is agent-safe by construction.
 - Purely static changes (comments, types without behavior) may stay on `check` only when that is appropriate.
 
 **API / backend:** The API runs via `bun run start`. API code lives under `src/api`, unit tests under `tests/unit`, integration tests under `tests/integration`. The public HTTP contract is **`contracts/openapi.yaml`** (validated in tests). Backend work uses Prisma and `src/domain` (types/dtos). **Data model overview and doc map:** [docs/data-model.md](docs/data-model.md). For the local database, use **podman**: `podman compose` (or `podman-compose`) with the repo's `docker-compose.yml`. **Testing conventions and integration fixtures:** [TESTING.md](TESTING.md).

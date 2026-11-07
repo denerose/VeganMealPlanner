@@ -15,9 +15,9 @@ Useful scripts:
 - `bun run test:integration` — integration tests only
 - `bun run test:all` — both
 - `./scripts/check.sh` or `bun run check` — format, lint, typecheck, and **unit** tests (default verification)
-- `./scripts/check-destructive.sh` or `bun run check-destructive` — same as `check`, plus **integration** tests (requires DB) and **changes DB state**. Deliberate final verification only — not for the routine loop and **not for agents**; otherwise prefer `check`.
+- `./scripts/check-integration.sh` or `bun run check-integration` — hermetic integration checks: provisions a disposable `veganmealplanner_test` database (drop/create + migrations) and runs `test:integration` against it. Never touches the dev database; safe for routine and agent use.
 
-**Check vs check-destructive (API / auth / HTTP):** `check` does not run `test:integration`. `check-destructive` changes DB state and is deliberate, human-run final verification (Postgres + migrations as above) for work that touches HTTP handlers, auth or session behavior, or Prisma-backed API paths—mirroring [AGENTS.md](AGENTS.md).
+**Check vs check-integration (API / auth / HTTP):** `check` does not run `test:integration`. `check-integration` runs the DB-backed suite against a disposable `veganmealplanner_test` database (never the dev DB) for work that touches HTTP handlers, auth or session behavior, or Prisma-backed API paths—mirroring [AGENTS.md](AGENTS.md).
 
 ## Reusing fixture data in API integration tests
 
@@ -60,7 +60,7 @@ Tests under [`tests/integration/api/`](tests/integration/api/) hit `createFetchH
 
 | OpenAPI area                                       | Primary test file(s)                                                                   |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Health                                             | [`health.test.ts`](tests/integration/api/health.test.ts)                               |
+| Health (handler contract; unit-level, no DB)       | [`tests/unit/api/health.test.ts`](tests/unit/api/health.test.ts)                       |
 | Auth (register, login, logout)                     | [`auth.test.ts`](tests/integration/api/auth.test.ts)                                   |
 | Routing (undocumented 404 empty body, 405 + Allow) | [`routing-contract.test.ts`](tests/integration/api/routing-contract.test.ts)           |
 | Me, household, members                             | [`me-household.test.ts`](tests/integration/api/me-household.test.ts)                   |
