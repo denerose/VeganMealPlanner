@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs format, lint, typecheck, and unit tests only. Integration tests are not run here;
-# use ./scripts/check-all.sh (or bun run check-all) to include bun run test:integration.
+# Runs format, lint, typecheck, and unit tests only. Integration tests are not run here.
+# ./scripts/check-destructive.sh (or bun run check-destructive) also runs test:integration,
+# but it MUTATES local DB state — deliberate final verification only, not routine/agent use.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# DESTRUCTIVE: runs format, lint, typecheck, unit AND integration tests.
+# Integration tests require Postgres and CHANGE local DB state (seed/mutate data).
+# Not for routine or agent use — deliberate final verification by the human only.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1

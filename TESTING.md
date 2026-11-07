@@ -15,9 +15,9 @@ Useful scripts:
 - `bun run test:integration` — integration tests only
 - `bun run test:all` — both
 - `./scripts/check.sh` or `bun run check` — format, lint, typecheck, and **unit** tests (default verification)
-- `./scripts/check-all.sh` or `bun run check-all` — same as `check`, plus **integration** tests (requires DB). **Use only when** integration tests were **updated** or **unit tests cannot fully exercise** the behavior under test; otherwise prefer `check`.
+- `./scripts/check-destructive.sh` or `bun run check-destructive` — same as `check`, plus **integration** tests (requires DB) and **changes DB state**. Deliberate final verification only — not for the routine loop and **not for agents**; otherwise prefer `check`.
 
-**Check vs check-all (API / auth / HTTP):** `check` does not run `test:integration`. For work that touches HTTP handlers, auth or session behavior, or Prisma-backed API paths, use **`check-all`** as final verification (Postgres + migrations as above) when DB-backed tests are needed—mirroring [AGENTS.md](AGENTS.md).
+**Check vs check-destructive (API / auth / HTTP):** `check` does not run `test:integration`. `check-destructive` changes DB state and is deliberate, human-run final verification (Postgres + migrations as above) for work that touches HTTP handlers, auth or session behavior, or Prisma-backed API paths—mirroring [AGENTS.md](AGENTS.md).
 
 ## Reusing fixture data in API integration tests
 
