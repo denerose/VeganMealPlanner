@@ -1,5 +1,11 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { type MealMapperMealRow, toMealResponseDto } from '../../domain/mappers/meal-mapper';
+import {
+  MealLeftovers,
+  isMealLeftoversValue,
+  mealLeftoversFromValue,
+  type MealLeftoversValue,
+} from '../../domain/types/enums';
 import type { ApiContext } from '../handlers/me-household';
 import {
   collectHeroIngredientIds,
@@ -77,6 +83,8 @@ function parseHeroSpecs(v: unknown): MealHeroSpecDto[] {
   });
 }
 
+const LEFTOVERS_MESSAGE = 'qualities.leftovers must be one of: always, never, optionally';
+
 function parseQualities(v: unknown): Partial<MealQualitiesDto> | undefined {
   if (v === undefined) return undefined;
   if (v === null || typeof v !== 'object' || Array.isArray(v)) {
@@ -91,8 +99,17 @@ function parseQualities(v: unknown): Partial<MealQualitiesDto> | undefined {
     }
     return raw;
   };
+  const leftovers = ((): MealLeftoversValue | undefined => {
+    const raw = o.leftovers;
+    if (raw === undefined) return undefined;
+    if (!isMealLeftoversValue(raw)) {
+      throw new ApiProblem(422, 'invalid_body', LEFTOVERS_MESSAGE);
+    }
+    return raw;
+  })();
   return {
-    makesLeftovers: flag('makesLeftovers'),
+    leftovers,
+    isEasyToMake: flag('isEasyToMake'),
     isGreasy: flag('isGreasy'),
     isCreamy: flag('isCreamy'),
     isAcidic: flag('isAcidic'),
@@ -131,20 +148,7 @@ export function parseMealUpdate(body: unknown): MealUpdateDto {
   };
 }
 
-function toMealMapperRow(m: {
-  id: string;
-  householdId: string;
-  name: string;
-  description: string;
-  recipeUrl: string | null;
-  imageId: string | null;
-  makesLeftovers: boolean;
-  isGreasy: boolean;
-  isCreamy: boolean;
-  isAcidic: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}): MealMapperMealRow {
+function toMealMapperRow(m: MealMapperMealRow): MealMapperMealRow {
   return {
     id: m.id,
     householdId: m.householdId,
@@ -152,7 +156,8 @@ function toMealMapperRow(m: {
     description: m.description,
     recipeUrl: m.recipeUrl,
     imageId: m.imageId,
-    makesLeftovers: m.makesLeftovers,
+    isEasyToMake: m.isEasyToMake,
+    leftovers: m.leftovers,
     isGreasy: m.isGreasy,
     isCreamy: m.isCreamy,
     isAcidic: m.isAcidic,
@@ -211,7 +216,7 @@ async function assertLeftoverSourcesValid(
   }
   const unique = [...new Set(sourceMealIds)];
   const n = await prisma.meal.count({
-    where: { householdId, makesLeftovers: true, id: { in: unique } },
+    where: { householdId, leftovers: { not: MealLeftovers.NEVER }, id: { in: unique } },
   });
   if (n !== unique.length) {
     throw new ApiProblem(
@@ -252,12 +257,23 @@ async function loadMealBundle(prisma: PrismaClient, householdId: string, mealId:
 
 function mealWhereFromUrl(url: URL, householdId: string): Prisma.MealWhereInput {
   const where: Prisma.MealWhereInput = { householdId };
-  const flags = ['makesLeftovers', 'isGreasy', 'isCreamy', 'isAcidic'] as const;
+  const flags = ['isEasyToMake', 'isGreasy', 'isCreamy', 'isAcidic'] as const;
   for (const f of flags) {
     const v = parseBoolQuery(url.searchParams.get(f));
     if (v === true || v === false) {
       where[f] = v;
     }
+  }
+  const leftoversRaw = url.searchParams.get('leftovers');
+  if (leftoversRaw !== null) {
+    if (!isMealLeftoversValue(leftoversRaw)) {
+      throw new ApiProblem(
+        422,
+        'invalid_query',
+        'leftovers must be one of: always, never, optionally'
+      );
+    }
+    where.leftovers = mealLeftoversFromValue(leftoversRaw);
   }
   const heroIds = collectHeroIngredientIds(url.searchParams);
   for (const id of heroIds) {
@@ -344,7 +360,11 @@ export async function createMeal(req: Request, ctx: ApiContext): Promise<Respons
           description: dto.description ?? '',
           recipeUrl: dto.recipeUrl ?? undefined,
           imageId: dto.imageId ?? undefined,
-          makesLeftovers: q.makesLeftovers ?? false,
+          leftovers:
+            q.leftovers === undefined
+              ? MealLeftovers.OPTIONALLY
+              : mealLeftoversFromValue(q.leftovers),
+          isEasyToMake: q.isEasyToMake ?? false,
           isGreasy: q.isGreasy ?? false,
           isCreamy: q.isCreamy ?? false,
           isAcidic: q.isAcidic ?? false,
@@ -420,7 +440,8 @@ export async function updateMeal(mealId: string, req: Request, ctx: ApiContext):
   if (dto.description !== undefined) data.description = dto.description;
   if (dto.recipeUrl !== undefined) data.recipeUrl = dto.recipeUrl;
   if (dto.imageId !== undefined) data.imageId = dto.imageId;
-  if (q?.makesLeftovers !== undefined) data.makesLeftovers = q.makesLeftovers;
+  if (q?.leftovers !== undefined) data.leftovers = mealLeftoversFromValue(q.leftovers);
+  if (q?.isEasyToMake !== undefined) data.isEasyToMake = q.isEasyToMake;
   if (q?.isGreasy !== undefined) data.isGreasy = q.isGreasy;
   if (q?.isCreamy !== undefined) data.isCreamy = q.isCreamy;
   if (q?.isAcidic !== undefined) data.isAcidic = q.isAcidic;

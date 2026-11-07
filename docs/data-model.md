@@ -102,14 +102,18 @@ Auth-related migrations (folder **`20260328130000_auth_api`**) add **`email`** a
 - `name` (string), `description` (string) — **non-null** in DB; empty string allowed when the user leaves description blank
 - `recipeUrl` (nullable string)
 - `imageId` (nullable string) — **opaque**; no `Image` / asset table in MVP
-- **Qualities** (boolean columns, default `false`):
-  - `makesLeftovers`
-  - `isGreasy`
-  - `isCreamy`
-  - `isAcidic`
+- **Qualities** (household-scoped meal state):
+  - `leftovers` — enum `MealLeftovers` (`ALWAYS` | `NEVER` | `OPTIONALLY`, default `OPTIONALLY`):
+    - `ALWAYS` — meal inherently over-produces ("makes a big pot", lasagna pan); surplus is a constraint: it needs a destination (next-day meal, deliberate freeze)
+    - `NEVER` — doesn't keep / doesn't travel; no queue role
+    - `OPTIONALLY` — batch size is the cook's dial; explicit sizing ("make double sauce") when demand exists
+  - `isEasyToMake` (boolean, default `false`) — easy for **this** household to make; effort is recipe/tool-relative (e.g. risotto is easy in a Thermomix house)
+  - `isGreasy` (boolean, default `false`)
+  - `isCreamy` (boolean, default `false`)
+  - `isAcidic` (boolean, default `false`)
 - `createdAt`, `updatedAt`
 
-New qualities in the future = **new boolean columns** + migration (explicit trade-off for simplicity and query clarity).
+New qualities in the future = **new boolean or enum columns** + migration (explicit trade-off for simplicity and query clarity). The API surface uses lowercase wire values (`always` / `never` / `optionally`) for `leftovers`.
 
 ### `Ingredient` (household catalog)
 
@@ -138,7 +142,7 @@ New qualities in the future = **new boolean columns** + migration (explicit trad
 
 - `consumerMealId` (FK → `Meal`, cascade on consumer delete), `sourceMealId` (FK → `Meal`, restrict — deleting a meal others consume is blocked with `409 leftover_source_in_use`)
 - Unique `(consumerMealId, sourceMealId)`
-- **Invariants (application layer, enforced at write time):** both meals belong to the same household; `sourceMealId` must reference a meal with `makesLeftovers = true`; self-reference is rejected. Write-time only — later quality edits do not cascade. Transitive cycles are allowed (relations are declarative; planner UIs interpret them). "Either of N sources satisfies" = N rows.
+- **Invariants (application layer, enforced at write time):** both meals belong to the same household; `sourceMealId` must reference a meal with `leftovers != NEVER` (both `ALWAYS` and `OPTIONALLY` can supply leftovers); self-reference is rejected. Write-time only — later quality edits do not cascade. Transitive cycles are allowed (relations are declarative; planner UIs interpret them). "Either of N sources satisfies" = N rows.
 
 ### `DayPlan`
 

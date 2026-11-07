@@ -52,6 +52,16 @@ Flags:
 
 const API_MAX_LIMIT = 100;
 
+const LEFTOVERS_LABELS: Record<string, string> = {
+  always: 'Always',
+  never: 'Never',
+  optionally: 'Optionally',
+};
+
+function leftoversLabel(value: string): string {
+  return LEFTOVERS_LABELS[value] ?? value;
+}
+
 async function listMeals(flags: Record<string, string>, json: boolean): Promise<void> {
   const userLimit = flags['--limit'] ? Number(flags['--limit']) : 50;
   const userOffset = flags['--offset'] ? Number(flags['--offset']) : 0;
@@ -91,7 +101,7 @@ async function listMeals(flags: Record<string, string>, json: boolean): Promise<
       meals.map((m) => [
         m.id,
         m.name,
-        m.qualities.makesLeftovers ? 'Yes' : 'No',
+        leftoversLabel(m.qualities.leftovers),
         m.description
           ? m.description.length > 40
             ? m.description.slice(0, 37) + '...'
@@ -119,7 +129,8 @@ async function getMeal(id: string | undefined, json: boolean): Promise<void> {
     ['Name', meal.name],
     ['Description', meal.description || '—'],
     ['Recipe URL', meal.recipeUrl ?? '—'],
-    ['Makes Leftovers', meal.qualities.makesLeftovers ? 'Yes' : 'No'],
+    ['Leftovers', leftoversLabel(meal.qualities.leftovers)],
+    ['Easy To Make', meal.qualities.isEasyToMake ? 'Yes' : 'No'],
     ['Greasy', meal.qualities.isGreasy ? 'Yes' : 'No'],
     ['Creamy', meal.qualities.isCreamy ? 'Yes' : 'No'],
     ['Acidic', meal.qualities.isAcidic ? 'Yes' : 'No'],

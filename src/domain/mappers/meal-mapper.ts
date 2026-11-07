@@ -1,4 +1,5 @@
-import type { IngredientStorageType } from '../types/enums';
+import { type MealLeftovers, type IngredientStorageType } from '@prisma/client';
+import { mealLeftoversToValue } from '../types/enums';
 import type { MealLeftoverSourceDto, MealResponseDto } from '../dtos/meal';
 import { toHouseholdId, toIngredientId, toMealId, toUserId } from '../types/ids';
 
@@ -9,7 +10,8 @@ export interface MealMapperMealRow {
   description: string;
   recipeUrl: string | null;
   imageId: string | null;
-  makesLeftovers: boolean;
+  isEasyToMake: boolean;
+  leftovers: MealLeftovers;
   isGreasy: boolean;
   isCreamy: boolean;
   isAcidic: boolean;
@@ -52,7 +54,8 @@ export function toMealResponseDto(input: MealMapperInput): MealResponseDto {
     recipeUrl: meal.recipeUrl,
     imageId: meal.imageId,
     qualities: {
-      makesLeftovers: meal.makesLeftovers,
+      leftovers: mealLeftoversToValue(meal.leftovers),
+      isEasyToMake: meal.isEasyToMake,
       isGreasy: meal.isGreasy,
       isCreamy: meal.isCreamy,
       isAcidic: meal.isAcidic,

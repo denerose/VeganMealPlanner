@@ -1,8 +1,9 @@
-import type { IngredientStorageType } from '../types/enums';
+import type { IngredientStorageType, MealLeftoversValue } from '../types/enums';
 import type { HouseholdId, IngredientId, MealId, UserId } from '../types/ids';
 
 export interface MealQualitiesDto {
-  makesLeftovers: boolean;
+  leftovers: MealLeftoversValue;
+  isEasyToMake: boolean;
   isGreasy: boolean;
   isCreamy: boolean;
   isAcidic: boolean;

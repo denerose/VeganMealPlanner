@@ -27,7 +27,7 @@ describe('parseMealCreate', () => {
       description: ' Coconutty ',
       recipeUrl: 'https://example.org/curry',
       imageId: null,
-      qualities: { isCreamy: true },
+      qualities: { isCreamy: true, isEasyToMake: true, leftovers: 'always' },
       heroIngredientIds: [{ ingredientId: 'ing-1' }, { ingredientId: 'ing-2', sortOrder: 3 }],
       cookedByUserIds: ['user-1'],
     });
@@ -35,7 +35,7 @@ describe('parseMealCreate', () => {
     expect(dto.description).toBe(' Coconutty ');
     expect(dto.recipeUrl).toBe('https://example.org/curry');
     expect(dto.imageId).toBeNull();
-    expect(dto.qualities).toEqual({ isCreamy: true });
+    expect(dto.qualities).toEqual({ isCreamy: true, isEasyToMake: true, leftovers: 'always' });
     expect(dto.heroIngredientIds).toEqual([
       { ingredientId: toIngredientId('ing-1') },
       { ingredientId: toIngredientId('ing-2'), sortOrder: 3 },
@@ -84,6 +84,24 @@ describe('parseMealCreate', () => {
       parseMealCreate({ name: 'M', qualities: { isGreasy: 'very' } })
     );
     expectApiProblem(badFlag, 422, 'invalid_body', 'qualities.isGreasy must be a boolean');
+
+    const badEasy = catchProblem(() =>
+      parseMealCreate({ name: 'M', qualities: { isEasyToMake: 'sort of' } })
+    );
+    expectApiProblem(badEasy, 422, 'invalid_body', 'qualities.isEasyToMake must be a boolean');
+  });
+
+  it('validates qualities.leftovers enum', () => {
+    const message = 'qualities.leftovers must be one of: always, never, optionally';
+    for (const bad of ['sometimes', 'ALWAYS', '', true, 7, null]) {
+      const e = catchProblem(() => parseMealCreate({ name: 'M', qualities: { leftovers: bad } }));
+      expectApiProblem(e, 422, 'invalid_body', message);
+    }
+
+    for (const good of ['always', 'never', 'optionally'] as const) {
+      const dto = parseMealCreate({ name: 'M', qualities: { leftovers: good } });
+      expect(dto.qualities?.leftovers).toBe(good);
+    }
   });
 
   it('validates heroIngredientIds shape', () => {

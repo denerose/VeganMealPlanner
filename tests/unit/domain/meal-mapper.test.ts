@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { IngredientStorageType } from '@prisma/client';
+import { IngredientStorageType, MealLeftovers } from '@prisma/client';
 import { toMealResponseDto } from '../../../src/domain/mappers/meal-mapper';
 import { toHouseholdId, toIngredientId, toMealId, toUserId } from '../../../src/domain/types/ids';
 
@@ -13,7 +13,8 @@ describe('toMealResponseDto', () => {
         description: '',
         recipeUrl: null,
         imageId: null,
-        makesLeftovers: true,
+        leftovers: MealLeftovers.ALWAYS,
+        isEasyToMake: true,
         isGreasy: false,
         isCreamy: true,
         isAcidic: false,
@@ -38,7 +39,8 @@ describe('toMealResponseDto', () => {
     });
 
     expect(dto.qualities).toEqual({
-      makesLeftovers: true,
+      leftovers: 'always',
+      isEasyToMake: true,
       isGreasy: false,
       isCreamy: true,
       isAcidic: false,
@@ -58,7 +60,8 @@ describe('toMealResponseDto', () => {
         description: '',
         recipeUrl: null,
         imageId: null,
-        makesLeftovers: false,
+        leftovers: MealLeftovers.NEVER,
+        isEasyToMake: false,
         isGreasy: false,
         isCreamy: false,
         isAcidic: false,
@@ -108,7 +111,8 @@ describe('toMealResponseDto', () => {
         description: '',
         recipeUrl: null,
         imageId: null,
-        makesLeftovers: true,
+        leftovers: MealLeftovers.OPTIONALLY,
+        isEasyToMake: true,
         isGreasy: false,
         isCreamy: false,
         isAcidic: false,
